@@ -21,6 +21,7 @@ class WPAgent_Conversation_Summaries {
 	public function register() {
 		add_action( 'init', array( $this, 'maybe_schedule_cron' ) );
 		add_action( self::CRON_HOOK, array( $this, 'process_due' ) );
+		add_action( 'admin_post_wpagent_process_summaries_now', array( $this, 'handle_process_now' ) );
 
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
@@ -77,6 +78,15 @@ class WPAgent_Conversation_Summaries {
 		echo '</select> ';
 		submit_button( __( 'Filtrar', 'wpagent' ), 'secondary', 'filter', false );
 		echo '</form>';
+
+		echo '<p>';
+		$process_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=wpagent_process_summaries_now' ),
+			'wpagent_process_summaries_now'
+		);
+		echo '<a href="' . esc_url( $process_url ) . '" class="button button-secondary">' . esc_html__( 'Processar resumos agora', 'wpagent' ) . '</a> ';
+		echo '<span class="description">' . esc_html__( 'Clique para verificar e gerar resumos pendentes imediatamente (nao precisa esperar o cron).', 'wpagent' ) . '</span>';
+		echo '</p>';
 
 		$pending = $this->get_pending_conversations( $agent_filter, 20 );
 		if ( ! empty( $pending ) ) {
@@ -244,7 +254,10 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 
 		$recent = $this->repository->get_conversation_interactions( $conversation_id, $agent_slug, 50 );
 		if ( empty( $recent ) || count( $recent ) < 2 ) {
-			return;
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WPAgent Summary: conversation ' . $conversation_id . ' has only ' . count( $recent ) . ' interactions, skipping.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return false;
 		}
 
 		$transcript = '';
@@ -267,7 +280,10 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 		$result = $this->generate_text( $prompt, $system, $agent );
 
 		if ( is_wp_error( $result ) ) {
-			return;
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WPAgent Summary: AI error for conversation ' . $conversation_id . ': ' . $result->get_error_message() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return false;
 		}
 
 		$data_points = $this->parse_summary_json( $result );
@@ -367,6 +383,18 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 		$this->generate_summary_for_conversation( $data, $agent );
 
 		wp_safe_redirect( $this->admin_url( array( 'agent' => $agent_slug ) ) );
+		exit;
+	}
+
+	public function handle_process_now() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sem permissao.', 'wpagent' ) );
+		}
+		check_admin_referer( 'wpagent_process_summaries_now' );
+
+		$this->process_due();
+
+		wp_safe_redirect( $this->admin_url() );
 		exit;
 	}
 

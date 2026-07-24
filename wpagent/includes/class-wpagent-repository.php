@@ -1365,17 +1365,23 @@ class WPAgent_Repository {
 		$cutoff       = gmdate( 'Y-m-d H:i:s', time() + $gmt_offset * 3600 - $delay_hours * 3600 );
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT c.*,
-					COUNT(DISTINCT i.id) AS interaction_count,
-					MAX(i.id) AS last_interaction_id,
-					MAX(i.created_at) AS last_interaction_at
+				"SELECT c.id, c.conversation_id, c.user_id, c.agent_slug, c.title, c.updated_at,
+					COALESCE(agg.interaction_count, 0) AS interaction_count,
+					COALESCE(agg.last_interaction_id, 0) AS last_interaction_id,
+					COALESCE(agg.last_interaction_at, '') AS last_interaction_at
 				FROM {$conv_table} c
-				LEFT JOIN {$int_table} i ON c.conversation_id = i.conversation_id AND c.agent_slug = i.agent_slug
+				LEFT JOIN (
+					SELECT conversation_id, agent_slug,
+						COUNT(DISTINCT id) AS interaction_count,
+						MAX(id) AS last_interaction_id,
+						MAX(created_at) AS last_interaction_at
+					FROM {$int_table}
+					GROUP BY conversation_id, agent_slug
+				) agg ON c.conversation_id = agg.conversation_id AND c.agent_slug = agg.agent_slug
 				LEFT JOIN {$summ_table} s ON c.conversation_id = s.conversation_id AND c.agent_slug = s.agent_slug
 				WHERE c.agent_slug = %s
 					AND c.updated_at <= %s
 					AND s.id IS NULL
-				GROUP BY c.id
 				ORDER BY c.updated_at ASC
 				LIMIT %d",
 				$agent_slug,
