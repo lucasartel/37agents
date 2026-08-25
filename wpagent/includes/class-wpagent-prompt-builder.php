@@ -12,21 +12,23 @@ class WPAgent_Prompt_Builder {
 	private $embeddings;
 	private $admin_abilities;
 	private $email_actions;
+	private $email_schedules;
 
-	public function __construct( WPAgent_Repository $repository, WPAgent_Settings $settings, WPAgent_Agents $agents, ?WPAgent_Embeddings $embeddings = null, ?WPAgent_Admin_Abilities $admin_abilities = null, ?WPAgent_Email_Actions $email_actions = null ) {
+	public function __construct( WPAgent_Repository $repository, WPAgent_Settings $settings, WPAgent_Agents $agents, ?WPAgent_Embeddings $embeddings = null, ?WPAgent_Admin_Abilities $admin_abilities = null, ?WPAgent_Email_Actions $email_actions = null, ?WPAgent_Email_Schedules $email_schedules = null ) {
 		$this->repository      = $repository;
 		$this->settings        = $settings;
 		$this->agents          = $agents;
 		$this->embeddings      = $embeddings;
 		$this->admin_abilities = $admin_abilities;
 		$this->email_actions   = $email_actions;
+		$this->email_schedules = $email_schedules;
 	}
 
-	public function build( $message, $user_id, $agent_slug, $conversation_id = '', $session_id = '' ) {
+	public function build( $message, $user_id, $agent_slug, $conversation_id = '', $session_id = '', $project_id = null ) {
 		$agent         = $this->agents->get_agent( $agent_slug );
 		$agent_slug    = $agent['slug'];
 		$system_prompt = trim( wp_strip_all_tags( $agent['system_prompt'] ) );
-		$knowledge     = $this->search_knowledge( $message, $agent, absint( $agent['max_knowledge_items'] ) );
+		$knowledge     = $this->search_knowledge( $message, $agent, absint( $agent['max_knowledge_items'] ), $conversation_id, $project_id );
 		$user_profile  = '1' === ( $agent['user_profile_enabled'] ?? '0' ) ? $this->repository->get_user_profile_memory( $user_id, $agent_slug ) : '';
 		$memories      = $this->repository->get_memories( $user_id, $agent_slug, absint( $agent['max_memory_items'] ) );
 		$recent_limit  = absint( $agent['max_recent_interactions'] );
@@ -40,6 +42,25 @@ class WPAgent_Prompt_Builder {
 			$site_context = $this->get_site_context();
 			if ( $site_context ) {
 				$context_parts[] = $site_context;
+			}
+		}
+
+		if ( ! empty( $project_id ) ) {
+			$project = $this->repository->get_project( $project_id, $user_id, $agent_slug );
+			if ( $project ) {
+				$project_profile = 'Nome do Projeto: ' . $project['name'] . "\n";
+				if ( ! empty( $project['profile_data'] ) && is_array( $project['profile_data'] ) ) {
+					$p_lines = array();
+					foreach ( $project['profile_data'] as $k => $v ) {
+						if ( '' !== trim( (string) $v ) ) {
+							$p_lines[] = '- ' . $k . ': ' . trim( (string) $v );
+						}
+					}
+					if ( ! empty( $p_lines ) ) {
+						$project_profile .= "Dados de Perfil do Projeto:\n" . implode( "\n", $p_lines );
+					}
+				}
+				$context_parts[] = "Perfil do Projeto/Cliente Ativo (Aba):\n" . $this->compact_text( $project_profile, 1400 );
 			}
 		}
 
@@ -86,6 +107,13 @@ class WPAgent_Prompt_Builder {
 			}
 		}
 
+		if ( $this->email_schedules ) {
+			$schedule_context = $this->email_schedules->prompt_context( $agent );
+			if ( $schedule_context ) {
+				$context_parts[] = $schedule_context;
+			}
+		}
+
 		$context = implode( "\n\n---\n\n", $context_parts );
 
 		$messages = array(
@@ -115,7 +143,7 @@ class WPAgent_Prompt_Builder {
 		);
 	}
 
-	private function search_knowledge( $message, $agent, $limit ) {
+	private function search_knowledge( $message, $agent, $limit, $conversation_id = '', $project_id = null ) {
 		if ( $limit < 1 ) {
 			return array();
 		}
@@ -127,7 +155,7 @@ class WPAgent_Prompt_Builder {
 			}
 		}
 
-		$chunks = $this->repository->search_training_chunks( $agent['slug'], $message, $limit );
+		$chunks = $this->repository->search_training_chunks( $agent['slug'], $message, $limit, $conversation_id, $project_id );
 		if ( ! empty( $chunks ) ) {
 			return $this->knowledge_from_chunks( $chunks, 'keyword' );
 		}

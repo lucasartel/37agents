@@ -151,11 +151,15 @@
 			abilitiesUrl: chat.getAttribute('data-abilities-url') || '',
 			emailActionsUrl: chat.getAttribute('data-email-actions-url') || '',
 			emailSchedulesUrl: chat.getAttribute('data-email-schedules-url') || '',
+			projectsUrl: chat.getAttribute('data-projects-url') || '',
+			enableProjects: chat.getAttribute('data-enable-projects') === '1',
 			nonce: chat.getAttribute('data-nonce') || '',
 			isLoggedIn: chat.getAttribute('data-logged-in') === '1',
 			canDebugErrors: chat.getAttribute('data-debug-errors') === '1',
 			userProfileEnabled: chat.getAttribute('data-user-profile-enabled') === '1',
 			requestTimeoutMs: Math.max(30000, Number(chat.getAttribute('data-request-timeout')) || 105000),
+			uploadUrl: chat.getAttribute('data-upload-url') || '',
+			enableFrontendUploads: chat.getAttribute('data-enable-frontend-uploads') === '1',
 			showTokenUsage: chat.getAttribute('data-show-token-usage') === '1',
 			defaultTheme: chat.getAttribute('data-default-theme') === 'dark' ? 'dark' : 'light'
 		};
@@ -492,12 +496,20 @@
 				|| /bot[aã]o\s+rtf|rtf\s+button|baixar.+rtf|download.+rtf|formato edit[aá]vel.+rtf|editable format.+rtf/i.test(value);
 		}
 
+		function stripProposalBlocks(text) {
+			return String(text || '')
+				.replace(/```wpagent-email-schedule[\s\S]*?```/gi, '')
+				.replace(/```wpagent-email[\s\S]*?```/gi, '')
+				.replace(/```wpagent-ability[\s\S]*?```/gi, '')
+				.trim();
+		}
+
 		function displayMessageText(text) {
-			return stripExportMarkers(text);
+			return stripProposalBlocks(stripExportMarkers(text));
 		}
 
 		function renderMarkdown(text) {
-			var html = stripExportMarkers(String(text || ''));
+			var html = stripProposalBlocks(stripExportMarkers(String(text || '')));
 
 			html = html.replace(/&/g, '&amp;')
 				.replace(/</g, '&lt;')
@@ -510,6 +522,39 @@
 				var placeholder = '\x00CODEBLOCK' + codeBlocks.length + '\x00';
 				codeBlocks.push('<pre class="wpagent-md__code-block"><code>' + code.replace(/\n$/, '') + '</code></pre>');
 				return placeholder;
+			});
+
+			var tableBlocks = [];
+			html = html.replace(/(?:^|\n)(\|.+?\|\s*\n\|(?:\s*:-*:?\s*\|)+\s*\n(?:\|.+?\|\s*(?:\n|$))+)/g, function (match, tableText) {
+				var placeholder = '\x00TABLEBLOCK' + tableBlocks.length + '\x00';
+				var tLines = tableText.trim().split(/\r?\n/);
+				if (tLines.length < 2) return match;
+
+				var headerCells = tLines[0].split('|').map(function (c) { return c.trim(); }).filter(function (c, idx, arr) { return idx > 0 && idx < arr.length - 1; });
+				var rows = [];
+				for (var r = 2; r < tLines.length; r++) {
+					var rowCells = tLines[r].split('|').map(function (c) { return c.trim(); }).filter(function (c, idx, arr) { return idx > 0 && idx < arr.length - 1; });
+					if (rowCells.length > 0) {
+						rows.push(rowCells);
+					}
+				}
+
+				var tableHtml = '<div class="wpagent-md__table-wrapper"><table class="wpagent-md__table"><thead><tr>';
+				headerCells.forEach(function (h) {
+					tableHtml += '<th>' + h + '</th>';
+				});
+				tableHtml += '</tr></thead><tbody>';
+				rows.forEach(function (row) {
+					tableHtml += '<tr>';
+					for (var cellIdx = 0; cellIdx < headerCells.length; cellIdx++) {
+						tableHtml += '<td>' + (row[cellIdx] || '') + '</td>';
+					}
+					tableHtml += '</tr>';
+				});
+				tableHtml += '</tbody></table></div>';
+
+				tableBlocks.push(tableHtml);
+				return '\n\n' + placeholder + '\n\n';
 			});
 
 			var lines = html.split(/\r?\n/);
@@ -570,11 +615,15 @@
 			for (var p = 0; p < paragraphs.length; p++) {
 				var para = paragraphs[p].trim();
 				if (!para) { continue; }
-				if (/^<(h[1-3]|ul|ol|pre|blockquote)/.test(para)) { continue; }
-				if (/\x00CODEBLOCK/.test(para)) { continue; }
+				if (/^<(h[1-3]|ul|ol|pre|blockquote|div)/.test(para)) { continue; }
+				if (/\x00CODEBLOCK|\x00TABLEBLOCK/.test(para)) { continue; }
 				paragraphs[p] = '<p class="wpagent-md__p">' + para.replace(/\n/g, '<br>') + '</p>';
 			}
 			html = paragraphs.join('\n');
+
+			for (var tbl = 0; tbl < tableBlocks.length; tbl++) {
+				html = html.replace('\x00TABLEBLOCK' + tbl + '\x00', tableBlocks[tbl]);
+			}
 
 			for (var c = 0; c < codeBlocks.length; c++) {
 				html = html.replace('\x00CODEBLOCK' + c + '\x00', codeBlocks[c]);
@@ -844,21 +893,17 @@
 		var card = document.createElement('div');
 		var heading = document.createElement('strong');
 		var details = document.createElement('span');
-		var button = document.createElement('button');
 
-		card.className = 'wpagent-chat__schedule-proposal';
-		heading.textContent = t('scheduleProposal', 'Agendamento de e-mails') + ': ' + (proposal.name || scheduleTypeLabel(proposal));
+		card.className = 'wpagent-chat__schedule-proposal is-confirmed';
+		heading.textContent = '✅ ' + t('scheduleConfirmed', 'Inscrição Confirmada') + ': ' + (proposal.name || scheduleTypeLabel(proposal));
 		details.textContent = scheduleDescription(proposal);
-		button.type = 'button';
-		button.textContent = t('confirmSchedule', 'Confirmar inscrição');
 
-		button.addEventListener('click', function () {
-			if (!window.confirm(t('confirmSchedulePrompt', 'Confirmar este agendamento de e-mails recorrentes?'))) {
-				return;
-			}
+		card.appendChild(heading);
+		card.appendChild(details);
+		message.appendChild(card);
 
-			button.disabled = true;
-			setStatus(t('scheduling', 'Agendando inscrição...'));
+		// If for any reason auto_confirmed was not flagged by backend, confirm silently in background
+		if (!body || !body.auto_confirmed) {
 			request(config, config.emailSchedulesUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -869,22 +914,8 @@
 					conversation_id: conversationId,
 					interaction_id: body && body.interaction_id ? body.interaction_id : 0
 				})
-			}).then(function (result) {
-				card.classList.add('is-confirmed');
-				button.textContent = t('scheduleConfirmed', 'Inscrição confirmada');
-				setStatus(t('scheduleConfirmed', 'Inscrição confirmada'));
-				addMessage('agent', formatScheduleResult(result));
-			}).catch(function (error) {
-				button.disabled = false;
-				setStatus(t('scheduleError', 'Erro ao confirmar agendamento'));
-				addMessage('agent', error.message, 'wpagent-chat__message--error');
-			});
-		});
-
-		card.appendChild(heading);
-		card.appendChild(details);
-		card.appendChild(button);
-		message.appendChild(card);
+			}).catch(function () {});
+		}
 	}
 
 	function scheduleTypeLabel(proposal) {
@@ -945,16 +976,161 @@
 		function formatAbilityResult(body) {
 			var ability = body && body.ability ? body.ability : {};
 			var result = body && Object.prototype.hasOwnProperty.call(body, 'result') ? body.result : {};
-			var text = t('abilityExecuted', 'Acao executada') + ': ' + (ability.label || ability.ability || '');
+			var name = ability.ability || ability.name || '';
+			var label = ability.label || name || t('abilityExecuted', 'Ação executada');
+			var header = '**' + t('abilityExecuted', 'Ação executada') + ':** ' + label;
 
 			if (typeof result === 'string') {
-				return text + '\n\n' + result;
+				return header + '\n\n' + result;
+			}
+
+			if (result && (result.code || result.message) && result.status && result.status >= 400) {
+				return header + '\n\n❌ **' + (result.message || t('abilityError', 'Erro ao executar ação')) + '**';
+			}
+
+			// 1. List Plugins
+			if (name === 'wpagent/list-plugins' || (result && Array.isArray(result.plugins))) {
+				var plugins = (result && result.plugins) || [];
+				if (!plugins.length) {
+					return header + '\n\n' + t('noPluginsFound', 'Nenhum plugin encontrado.');
+				}
+				var pTable = '| Status | Plugin | Versão | Arquivo |\n|---|---|---|---|\n';
+				plugins.forEach(function (p) {
+					var status = p.active ? '🟢 Ativo' : '⚪ Inativo';
+					pTable += '| ' + status + ' | **' + (p.name || '—') + '** | ' + (p.version || '—') + ' | `' + (p.file || '—') + '` |\n';
+				});
+				return header + '\n\n' + pTable;
+			}
+
+			// 2. List / Search Users
+			if (name === 'wpagent/list-users' || name === 'wpagent/search-users' || (result && Array.isArray(result.users))) {
+				var users = (result && result.users) || [];
+				if (!users.length) {
+					return header + '\n\n' + t('noUsersFound', 'Nenhum usuário encontrado.');
+				}
+				var uTable = '| ID | Nome / Display | E-mail | Função |\n|---|---|---|---|\n';
+				users.forEach(function (u) {
+					var roles = Array.isArray(u.roles) ? u.roles.join(', ') : (u.roles || u.role || '—');
+					uTable += '| #' + (u.ID || u.id || '—') + ' | **' + (u.display_name || u.user_login || '—') + '** | `' + (u.user_email || '—') + '` | ' + roles + ' |\n';
+				});
+				return header + '\n\n' + uTable;
+			}
+
+			// 3. Search Posts / List Pages
+			if (name === 'wpagent/search-posts' || name === 'wpagent/list-pages' || (result && (Array.isArray(result.posts) || Array.isArray(result.pages)))) {
+				var items = (result && (result.posts || result.pages)) || [];
+				if (!items.length) {
+					return header + '\n\n' + t('noPostsFound', 'Nenhum conteúdo encontrado.');
+				}
+				var itemTable = '| ID | Título | Tipo | Status | Data |\n|---|---|---|---|---|\n';
+				items.forEach(function (it) {
+					var stVal = it.post_status || it.status || 'draft';
+					var statusBadge = stVal === 'publish' ? '🟢 Publicado' : '🟡 ' + stVal;
+					var link = it.guid || it.permalink || '';
+					var titleText = it.post_title || it.title || 'Sem título';
+					var title = link ? '[' + titleText + '](' + link + ')' : '**' + titleText + '**';
+					var dateVal = formatDate(it.post_date || it.date);
+					itemTable += '| #' + (it.ID || it.id || '—') + ' | ' + title + ' | `' + (it.post_type || 'post') + '` | ' + statusBadge + ' | ' + dateVal + ' |\n';
+				});
+				return header + '\n\n' + itemTable;
+			}
+
+			// 4. List Comments
+			if (name === 'wpagent/list-comments' || (result && Array.isArray(result.comments))) {
+				var comments = (result && result.comments) || [];
+				if (!comments.length) {
+					return header + '\n\n' + t('noCommentsFound', 'Nenhum comentário encontrado.');
+				}
+				var cTable = '| ID | Autor | Trecho do Comentário | Status | Post ID |\n|---|---|---|---|---|\n';
+				comments.forEach(function (c) {
+					var st = c.comment_approved === '1' ? '🟢 Aprovado' : (c.comment_approved === '0' ? '🟡 Pendente' : c.comment_approved);
+					var author = c.comment_author || 'Anônimo';
+					var excerpt = (c.comment_content || '').slice(0, 70) + ((c.comment_content || '').length > 70 ? '...' : '');
+					cTable += '| #' + (c.comment_ID || c.id) + ' | ' + author + ' | "' + excerpt + '" | ' + st + ' | #' + c.comment_post_ID + ' |\n';
+				});
+				return header + '\n\n' + cTable;
+			}
+
+			// 5. List Themes
+			if (name === 'wpagent/list-themes' || (result && Array.isArray(result.themes))) {
+				var themes = (result && result.themes) || [];
+				if (!themes.length) {
+					return header + '\n\n' + t('noThemesFound', 'Nenhum tema encontrado.');
+				}
+				var thLines = [];
+				themes.forEach(function (th) {
+					if (th.active) {
+						thLines.unshift('- 🟢 **Tema Ativo**: **' + (th.name || th.stylesheet) + '** (v' + (th.version || '1.0') + ')');
+					} else {
+						thLines.push('- ⚪ **' + (th.name || th.stylesheet) + '** (v' + (th.version || '1.0') + ')');
+					}
+				});
+				return header + '\n\n' + thLines.join('\n');
+			}
+
+			// 6. Site Health / Site Info
+			if (name === 'wpagent/get-site-health' || name === 'wpagent/get-site-info' || (result && (result.php_version || result.site_name))) {
+				var shLines = [];
+				if (result.site_name) shLines.push('- **Nome do Site**: ' + result.site_name);
+				if (result.description) shLines.push('- **Descrição**: ' + result.description);
+				if (result.wp_version) shLines.push('- **Versão do WordPress**: ' + result.wp_version);
+				if (result.php_version) shLines.push('- **Versão do PHP**: ' + result.php_version);
+				if (result.mysql_version) shLines.push('- **Versão do MySQL**: ' + result.mysql_version);
+				if (result.active_theme) shLines.push('- **Tema Ativo**: ' + result.active_theme);
+				if (result.memory_limit) shLines.push('- **Limite de Memória**: ' + result.memory_limit);
+				if (typeof result.is_ssl !== 'undefined') shLines.push('- **HTTPS (SSL)**: ' + (result.is_ssl ? '🟢 Sim' : '🔴 Não'));
+				if (typeof result.upload_writable !== 'undefined') shLines.push('- **Uploads Graváveis**: ' + (result.upload_writable ? '🟢 Sim' : '🔴 Não'));
+				if (typeof result.curl_enabled !== 'undefined') shLines.push('- **Extensão cURL**: ' + (result.curl_enabled ? '🟢 Habilitado' : '🔴 Desabilitado'));
+				if (typeof result.total_posts !== 'undefined') shLines.push('- **Conteúdos**: ' + result.total_posts + ' posts | ' + (result.total_pages || 0) + ' páginas | ' + (result.total_users || 0) + ' usuários');
+
+				if (shLines.length) {
+					return header + '\n\n' + shLines.join('\n');
+				}
+			}
+
+			// 7. Get Option
+			if (name === 'wpagent/get-option' || (result && result.option_name)) {
+				return header + '\n\n- **Opção**: `' + result.option_name + '`\n- **Valor**: `' + result.value + '`';
+			}
+
+			// 8. Generic Array Fallback -> Render as Markdown Table
+			if (result && typeof result === 'object') {
+				var keys = Object.keys(result);
+				var arrayKey = keys.find(function (k) { return Array.isArray(result[k]); });
+				if (arrayKey && result[arrayKey].length) {
+					var arr = result[arrayKey];
+					var sample = arr[0];
+					if (sample && typeof sample === 'object') {
+						var cols = Object.keys(sample).slice(0, 5);
+						var genTable = '| ' + cols.join(' | ') + ' |\n|' + cols.map(function () { return '---'; }).join('|') + '|\n';
+						arr.forEach(function (row) {
+							genTable += '| ' + cols.map(function (col) {
+								var val = row[col];
+								if (typeof val === 'boolean') return val ? '🟢 Sim' : '⚪ Não';
+								if (val && typeof val === 'object') return JSON.stringify(val);
+								return String(val ?? '—');
+							}).join(' | ') + ' |\n';
+						});
+						return header + '\n\n' + genTable;
+					}
+				}
+
+				var kvLines = [];
+				keys.forEach(function (k) {
+					var val = result[k];
+					if (val && typeof val !== 'object') {
+						kvLines.push('- **' + k + '**: ' + val);
+					}
+				});
+				if (kvLines.length) {
+					return header + '\n\n' + kvLines.join('\n');
+				}
 			}
 
 			try {
-				return text + '\n\n' + JSON.stringify(result, null, 2);
+				return header + '\n\n```json\n' + JSON.stringify(result, null, 2) + '\n```';
 			} catch (error) {
-				return text;
+				return header;
 			}
 		}
 
@@ -1026,7 +1202,12 @@
 			}
 
 			setStatus(t('loadingConversations', 'Carregando conversas...'));
-			return request(config, config.conversationsUrl + '?agent_slug=' + encodeURIComponent(agent))
+			var url = config.conversationsUrl + '?agent_slug=' + encodeURIComponent(agent);
+			if (config.enableProjects && activeProjectId) {
+				url += '&project_id=' + encodeURIComponent(activeProjectId);
+			}
+
+			return request(config, url)
 				.then(function (body) {
 					conversations = body.conversations || [];
 					renderConversations();
@@ -1081,13 +1262,18 @@
 				return Promise.resolve();
 			}
 
+			var payload = {
+				agent_slug: agent,
+				title: t('newConversation', 'Nova conversa')
+			};
+			if (config.enableProjects && activeProjectId) {
+				payload.project_id = activeProjectId;
+			}
+
 			return request(config, config.conversationsUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					agent_slug: agent,
-					title: t('newConversation', 'Nova conversa')
-				})
+				body: JSON.stringify(payload)
 			}).then(function (body) {
 				var conversation = body.conversation;
 				conversationId = conversation.conversation_id;
@@ -1184,12 +1370,38 @@
 		}
 
 		function saveUserProfile() {
-			if (!config.isLoggedIn || !config.userProfileEnabled || !config.profileUrl || !profileTextarea || !profileSaveButton) {
+			if (!config.isLoggedIn || !config.userProfileEnabled || !profileTextarea || !profileSaveButton) {
 				return;
 			}
 
 			profileSaveButton.disabled = true;
 			setProfileStatus(t('savingProfile', 'Salvando perfil...'));
+
+			if (config.enableProjects && activeProjectId && config.projectsUrl) {
+				request(config, config.projectsUrl + '/' + activeProjectId, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						agent_slug: agent,
+						profile_data: {
+							free_text: profileTextarea.value || '',
+							structured: structuredProfileValues()
+						}
+					})
+				}).then(function (body) {
+					if (body.project) {
+						var idx = projects.findIndex(function (p) { return p.id == activeProjectId; });
+						if (idx !== -1) projects[idx] = body.project;
+						setProfileStatus(t('profileSaved', 'Perfil salvo'));
+					}
+				}).catch(function (error) {
+					setProfileStatus(error.message || t('profileSaveError', 'Erro ao salvar perfil'));
+				}).finally(function () {
+					profileSaveButton.disabled = false;
+				});
+				return;
+			}
+
 			request(config, config.profileUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -1207,6 +1419,166 @@
 			}).finally(function () {
 				profileSaveButton.disabled = false;
 			});
+		}
+
+		var projects = [];
+		var activeProjectId = null;
+		var addProjectButton = chat.querySelector('[data-wpagent-add-project]');
+
+		function loadProjects() {
+			if (!config.enableProjects || !config.projectsUrl) {
+				return Promise.resolve();
+			}
+
+			return request(config, config.projectsUrl + '?agent_slug=' + encodeURIComponent(agent))
+				.then(function (body) {
+					projects = body.projects || [];
+					if (projects.length > 0 && !activeProjectId) {
+						activeProjectId = projects[0].id;
+					}
+					renderProjects();
+					loadProjectProfile();
+				})
+				.catch(function () {});
+		}
+
+		function renderProjects() {
+			var projectsContainer = chat.querySelector('[data-wpagent-projects-tabs]');
+			if (!projectsContainer) return;
+			projectsContainer.innerHTML = '';
+
+			projects.forEach(function (proj) {
+				var tab = document.createElement('div');
+				tab.className = 'wpagent-chat__project-tab' + (proj.id == activeProjectId ? ' is-active' : '');
+				tab.setAttribute('data-project-id', proj.id);
+
+				var nameSpan = document.createElement('span');
+				nameSpan.className = 'wpagent-chat__project-name';
+				nameSpan.textContent = proj.name || t('project', 'Projeto');
+
+				tab.appendChild(nameSpan);
+
+				if (!proj.is_default) {
+					var delBtn = document.createElement('button');
+					delBtn.type = 'button';
+					delBtn.className = 'wpagent-chat__delete-project';
+					delBtn.setAttribute('title', t('deleteProject', 'Excluir aba'));
+					delBtn.textContent = '✕';
+					delBtn.addEventListener('click', function (e) {
+						e.stopPropagation();
+						deleteProject(proj.id, proj.name);
+					});
+					tab.appendChild(delBtn);
+				}
+
+				tab.addEventListener('click', function () {
+					switchProject(proj.id);
+				});
+
+				nameSpan.addEventListener('dblclick', function (e) {
+					e.stopPropagation();
+					renameProject(proj.id, proj.name);
+				});
+
+				projectsContainer.appendChild(tab);
+			});
+		}
+
+		function switchProject(id) {
+			if (activeProjectId === id) return;
+			activeProjectId = id;
+			conversationId = '';
+			setEmpty();
+			renderProjects();
+			loadConversations();
+			loadProjectProfile();
+		}
+
+		function createProject(e) {
+			if (e) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+
+			var defaultName = t('newProjectDefault', 'Novo Projeto');
+			var name = window.prompt(t('newProjectPrompt', 'Nome da nova aba / projeto:'), defaultName);
+			if (!name || !name.trim()) return;
+
+			setStatus(t('creatingProject', 'Criando nova aba...'));
+			request(config, config.projectsUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					agent_slug: agent,
+					name: name.trim()
+				})
+			}).then(function (body) {
+				if (body && body.project) {
+					projects.push(body.project);
+					activeProjectId = body.project.id;
+					conversationId = '';
+					setEmpty();
+					renderProjects();
+					loadConversations();
+					loadProjectProfile();
+					setStatus(t('ready', 'Pronto para conversar'));
+				} else {
+					setStatus(t('createProjectError', 'Erro ao criar aba'));
+				}
+			}).catch(function (error) {
+				setStatus(error.message || t('createProjectError', 'Erro ao criar aba'));
+			});
+		}
+
+		function renameProject(id, currentName) {
+			var newName = window.prompt(t('renameProjectPrompt', 'Novo nome do projeto:'), currentName);
+			if (!newName || !newName.trim() || newName.trim() === currentName) return;
+
+			request(config, config.projectsUrl + '/' + id, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					agent_slug: agent,
+					name: newName.trim()
+				})
+			}).then(function (body) {
+				if (body.project) {
+					var idx = projects.findIndex(function (p) { return p.id == id; });
+					if (idx !== -1) projects[idx] = body.project;
+					renderProjects();
+				}
+			});
+		}
+
+		function deleteProject(id, name) {
+			if (!window.confirm(t('confirmDeleteProject', 'Deseja excluir a aba "' + name + '"? As conversas dela serao desvinculadas.'))) return;
+
+			request(config, config.projectsUrl + '/' + id + '?agent_slug=' + encodeURIComponent(agent), {
+				method: 'DELETE'
+			}).then(function () {
+				projects = projects.filter(function (p) { return p.id != id; });
+				if (activeProjectId == id) {
+					activeProjectId = projects[0] ? projects[0].id : null;
+					conversationId = '';
+					setEmpty();
+					loadConversations();
+					loadProjectProfile();
+				}
+				renderProjects();
+			});
+		}
+
+		function loadProjectProfile() {
+			if (!config.enableProjects || !activeProjectId || !profileTextarea) return;
+
+			var activeProj = projects.find(function (p) { return p.id == activeProjectId; });
+			if (activeProj && activeProj.profile_data) {
+				var pData = activeProj.profile_data;
+				profileTextarea.value = pData.free_text || '';
+				setStructuredProfileValues(pData.structured || {});
+			} else {
+				loadUserProfile();
+			}
 		}
 
 		function structuredProfileValues() {
@@ -1269,7 +1641,8 @@
 					message: message,
 					agent_slug: agent,
 					session_id: sessionId,
-					conversation_id: conversationId
+					conversation_id: conversationId,
+					project_id: activeProjectId
 				})
 			})
 				.then(function (body) {
@@ -1305,6 +1678,153 @@
 			event.preventDefault();
 			sendMessage();
 		});
+
+		if (config.enableFrontendUploads && config.uploadUrl) {
+			var composerEl = form.querySelector('.wpagent-chat__composer');
+			if (composerEl) {
+				composerEl.classList.add('has-upload');
+
+				var fileInput = document.createElement('input');
+				fileInput.type = 'file';
+				fileInput.accept = '.txt,.md,.csv,.json,.pdf,.docx,.html,.htm';
+				fileInput.style.display = 'none';
+				chat.appendChild(fileInput);
+
+				var uploadBtn = document.createElement('button');
+				uploadBtn.type = 'button';
+				uploadBtn.className = 'wpagent-chat__upload-btn';
+				uploadBtn.title = t('uploadFile', 'Anexar documento (.pdf, .txt, .docx, .csv, .json)');
+				uploadBtn.innerHTML = '📎';
+				composerEl.insertBefore(uploadBtn, textarea);
+
+				uploadBtn.addEventListener('click', function () {
+					fileInput.value = '';
+					fileInput.click();
+				});
+
+				fileInput.addEventListener('change', function () {
+					var file = fileInput.files[0];
+					if (!file) return;
+
+					if (config.enableProjects && activeProjectId) {
+						showUploadScopeModal(file);
+					} else {
+						performUpload(file, 'conversation');
+					}
+				});
+
+				function showUploadScopeModal(file) {
+					var safeName = document.createElement('span');
+					safeName.textContent = file.name;
+
+					var modal = document.createElement('div');
+					modal.className = 'wpagent-chat__upload-modal';
+
+					var titleEl = document.createElement('h4');
+					titleEl.textContent = t('uploadModalTitle', 'Anexar Documento ao Atendimento');
+					modal.appendChild(titleEl);
+
+					var descEl = document.createElement('p');
+					descEl.textContent = t('uploadModalDesc', 'Escolha o escopo de conhecimento para o arquivo: ');
+					descEl.appendChild(safeName);
+					modal.appendChild(descEl);
+
+					var optionsDiv = document.createElement('div');
+					optionsDiv.className = 'wpagent-chat__upload-scope-options';
+
+					var opt1 = document.createElement('label');
+					opt1.className = 'wpagent-chat__upload-scope-option';
+					opt1.innerHTML = '<input type="radio" name="upload_scope" value="conversation" checked> <span>' + t('scopeConversation', 'Apenas nesta conversa atual') + '</span>';
+					optionsDiv.appendChild(opt1);
+
+					var opt2 = document.createElement('label');
+					opt2.className = 'wpagent-chat__upload-scope-option';
+					opt2.innerHTML = '<input type="radio" name="upload_scope" value="project"> <span>' + t('scopeProject', 'Em todas as conversas deste projeto') + '</span>';
+					optionsDiv.appendChild(opt2);
+
+					modal.appendChild(optionsDiv);
+
+					var actionsDiv = document.createElement('div');
+					actionsDiv.className = 'wpagent-chat__upload-modal-actions';
+
+					var cancelBtn = document.createElement('button');
+					cancelBtn.type = 'button';
+					cancelBtn.className = 'button wpagent-cancel-upload';
+					cancelBtn.textContent = t('cancel', 'Cancelar');
+					actionsDiv.appendChild(cancelBtn);
+
+					var confirmBtn = document.createElement('button');
+					confirmBtn.type = 'button';
+					confirmBtn.className = 'button button-primary wpagent-confirm-upload';
+					confirmBtn.textContent = t('uploadAndIndex', 'Enviar e Indexar');
+					actionsDiv.appendChild(confirmBtn);
+
+					modal.appendChild(actionsDiv);
+
+					var overlay = document.createElement('div');
+					overlay.style.position = 'absolute';
+					overlay.style.inset = '0';
+					overlay.style.background = 'rgba(0,0,0,0.45)';
+					overlay.style.zIndex = '99998';
+
+					chat.appendChild(overlay);
+					chat.appendChild(modal);
+
+					cancelBtn.addEventListener('click', function () {
+						modal.remove();
+						overlay.remove();
+					});
+
+					confirmBtn.addEventListener('click', function () {
+						var selectedRadio = modal.querySelector('input[name="upload_scope"]:checked');
+						var selectedScope = selectedRadio ? selectedRadio.value : 'conversation';
+						modal.remove();
+						overlay.remove();
+						performUpload(file, selectedScope);
+					});
+				}
+
+				function performUpload(file, scope) {
+					var pendingMsg = addMessage('agent', '⏳ ' + t('indexingFile', 'Enviando e indexando documento: ') + file.name + '...', 'wpagent-chat__message--pending');
+
+					var formData = new FormData();
+					formData.append('file', file);
+					formData.append('agent_slug', agent);
+					formData.append('conversation_id', conversationId || '');
+					formData.append('project_id', activeProjectId || 0);
+					formData.append('scope', scope);
+
+					fetch(config.uploadUrl, {
+						method: 'POST',
+						headers: {
+							'X-WP-Nonce': config.nonce
+						},
+						body: formData
+					})
+					.then(function (res) {
+						return res.json().then(function (data) {
+							if (!res.ok) {
+								throw new Error(data.message || t('uploadError', 'Erro ao enviar o arquivo.'));
+							}
+							return data;
+						});
+					})
+					.then(function (data) {
+						if (pendingMsg && pendingMsg.parentNode) {
+							pendingMsg.parentNode.removeChild(pendingMsg);
+						}
+						var scopeText = scope === 'project' ? t('scopeProjectLabel', 'projeto') : t('scopeConversationLabel', 'conversa');
+						addMessage('agent', '✅ ' + data.message + ' (' + t('scope', 'escopo') + ': ' + scopeText + ')');
+					})
+					.catch(function (err) {
+						if (pendingMsg && pendingMsg.parentNode) {
+							pendingMsg.parentNode.removeChild(pendingMsg);
+						}
+						addMessage('agent', '⚠️ ' + err.message, 'wpagent-chat__message--error');
+					});
+				}
+			}
+		}
 
 		function updateTokenUsageDisplay(usage) {
 			var container = chat.querySelector('.wpagent-chat__token-usage');
@@ -1385,16 +1905,45 @@
 
 		window.addEventListener('resize', updateConversationToggleState);
 
+		function loadInitialTokenUsage() {
+			var raw = chat.getAttribute('data-initial-token-usage');
+			if (!raw || !config.showTokenUsage) {
+				return;
+			}
+			try {
+				var usage = JSON.parse(raw);
+				if (usage) {
+					updateTokenUsageDisplay(usage);
+					updateProgressBar(usage);
+					checkTokenUsage(usage);
+				}
+			} catch (err) {}
+		}
+
+		chat.addEventListener('click', function (e) {
+			var addBtn = e.target.closest('[data-wpagent-add-project]');
+			if (addBtn) {
+				createProject(e);
+			}
+		});
+
 		newButtons.forEach(function (button) {
 			button.addEventListener('click', createConversation);
 		});
 		renameButton.addEventListener('click', renameConversation);
 		loadTheme();
+		loadInitialTokenUsage();
 		setEmpty();
 		updateConversationToggleState();
 		restoreGuestConversation();
-		loadConversations();
-		loadUserProfile();
+		if (config.enableProjects) {
+			loadProjects().then(function () {
+				loadConversations();
+			});
+		} else {
+			loadConversations();
+			loadUserProfile();
+		}
 	}
 
 	function setupFloatingAssistant(assistant) {

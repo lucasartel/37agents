@@ -21,8 +21,8 @@ class WPAgent_Reports {
 	public function add_menu() {
 		add_submenu_page(
 			'wpagent',
-			__( 'Reports', 'wpagent' ),
-			__( 'Reports', 'wpagent' ),
+			__( 'Relatórios', 'wpagent' ),
+			__( 'Relatórios', 'wpagent' ),
 			'manage_options',
 			'wpagent-reports',
 			array( $this, 'render_page' )
@@ -40,10 +40,12 @@ class WPAgent_Reports {
 		$lead_rows = $this->repository->get_email_leads_report( 200 );
 		$starts     = $this->repository->get_token_period_starts();
 		$agents     = $this->agents->get_agent_options();
+
+		WPAgent_Admin_UI::render_header(
+			__( 'Relatórios do WPAgents', 'wpagent' ),
+			__( 'Acompanhe o consumo de tokens, desempenho por agente e volume de atendimentos.', 'wpagent' )
+		);
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'WPAgent Reports', 'wpagent' ); ?></h1>
-			<p><?php esc_html_e( 'Acompanhe o consumo de tokens registrado por agente e por usuario.', 'wpagent' ); ?></p>
 			<p class="description">
 				<?php
 				printf(
@@ -209,8 +211,8 @@ class WPAgent_Reports {
 					<?php endif; ?>
 				</tbody>
 			</table>
-		</div>
 		<?php
+		WPAgent_Admin_UI::render_footer();
 	}
 
 	private function format_limits( $agent ) {

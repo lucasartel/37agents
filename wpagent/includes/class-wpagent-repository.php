@@ -104,26 +104,30 @@ class WPAgent_Repository {
 		);
 	}
 
-	public function create_conversation( $user_id, $agent_slug, $title = '' ) {
+	public function create_conversation( $user_id, $agent_slug, $title = '', $conversation_id = '', $project_id = null ) {
 		global $wpdb;
 
-		$conversation_id = wp_generate_uuid4();
+		$conversation_id = $conversation_id ? sanitize_text_field( $conversation_id ) : wp_generate_uuid4();
 		$title = $title ? sanitize_text_field( $title ) : __( 'Nova conversa', 'wpagent' );
 		$table = $wpdb->prefix . 'wpagent_conversations';
 
-		$wpdb->insert(
-			$table,
-			array(
-				'conversation_id' => $conversation_id,
-				'user_id'         => absint( $user_id ),
-				'agent_slug'      => sanitize_key( $agent_slug ),
-				'title'           => $title,
-				'status'          => 'active',
-				'created_at'      => current_time( 'mysql' ),
-				'updated_at'      => current_time( 'mysql' ),
-			),
-			array( '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
+		$data = array(
+			'conversation_id' => $conversation_id,
+			'user_id'         => absint( $user_id ),
+			'agent_slug'      => sanitize_key( $agent_slug ),
+			'title'           => $title,
+			'status'          => 'active',
+			'created_at'      => current_time( 'mysql' ),
+			'updated_at'      => current_time( 'mysql' ),
 		);
+		$format = array( '%s', '%d', '%s', '%s', '%s', '%s', '%s' );
+
+		if ( ! empty( $project_id ) ) {
+			$data['project_id'] = absint( $project_id );
+			$format[]           = '%d';
+		}
+
+		$wpdb->insert( $table, $data, $format );
 
 		return $this->get_conversation( $conversation_id, $user_id, $agent_slug );
 	}
@@ -144,20 +148,82 @@ class WPAgent_Repository {
 		);
 	}
 
-	public function list_conversations( $user_id, $agent_slug, $limit = 50 ) {
+	public function get_conversation_by_id( $conversation_id, $agent_slug = '' ) {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'wpagent_conversations';
 
+		if ( $agent_slug ) {
+			return $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT * FROM {$table} WHERE conversation_id = %s AND agent_slug = %s AND status = 'active'",
+					sanitize_text_field( $conversation_id ),
+					sanitize_key( $agent_slug )
+				),
+				ARRAY_A
+			);
+		}
+
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE conversation_id = %s AND status = 'active'",
+				sanitize_text_field( $conversation_id )
+			),
+			ARRAY_A
+		);
+	}
+
+	public function list_conversations( $user_id, $agent_slug, $limit = 50, $project_id = null ) {
+		global $wpdb;
+
+		$table          = $wpdb->prefix . 'wpagent_conversations';
+		$project_id_int = ( null !== $project_id && '' !== $project_id ) ? absint( $project_id ) : 0;
+
+		if ( $project_id_int > 0 ) {
+			return $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT conversation_id, title, created_at, updated_at, project_id FROM {$table} WHERE user_id = %d AND agent_slug = %s AND project_id = %d AND status = 'active' ORDER BY updated_at DESC LIMIT %d",
+					absint( $user_id ),
+					sanitize_key( $agent_slug ),
+					$project_id_int,
+					absint( $limit )
+				),
+				ARRAY_A
+			);
+		}
+
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT conversation_id, title, created_at, updated_at FROM {$table} WHERE user_id = %d AND agent_slug = %s AND status = 'active' ORDER BY updated_at DESC LIMIT %d",
+				"SELECT conversation_id, title, created_at, updated_at, project_id FROM {$table} WHERE user_id = %d AND agent_slug = %s AND (project_id IS NULL OR project_id = 0) AND status = 'active' ORDER BY updated_at DESC LIMIT %d",
 				absint( $user_id ),
 				sanitize_key( $agent_slug ),
 				absint( $limit )
 			),
 			ARRAY_A
 		);
+	}
+
+	public function update_conversation_project( $conversation_id, $user_id, $agent_slug, $project_id ) {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'wpagent_conversations';
+
+		$wpdb->update(
+			$table,
+			array(
+				'project_id' => absint( $project_id ),
+				'updated_at' => current_time( 'mysql' ),
+			),
+			array(
+				'conversation_id' => sanitize_text_field( $conversation_id ),
+				'user_id'         => absint( $user_id ),
+				'agent_slug'      => sanitize_key( $agent_slug ),
+			),
+			array( '%d', '%s' ),
+			array( '%s', '%d', '%s' )
+		);
+
+		return $this->get_conversation( $conversation_id, $user_id, $agent_slug );
 	}
 
 	public function update_conversation_title( $conversation_id, $user_id, $agent_slug, $title ) {
@@ -951,7 +1017,7 @@ class WPAgent_Repository {
 		return true;
 	}
 
-	public function search_training_chunks( $agent_slug, $query, $limit = 4 ) {
+	public function search_training_chunks( $agent_slug, $query, $limit = 4, $conversation_id = '', $project_id = null ) {
 		global $wpdb;
 
 		$limit = absint( $limit );
@@ -985,7 +1051,7 @@ class WPAgent_Repository {
 
 		$args[] = max( 60, $limit * 20 );
 		$sql = $wpdb->prepare(
-			"SELECT c.*, s.title AS source_title, s.filename, s.url, s.mime
+			"SELECT c.*, s.title AS source_title, s.filename, s.url, s.mime, s.metadata AS source_metadata
 			FROM {$chunks} c
 			INNER JOIN {$sources} s ON s.id = c.source_id
 			WHERE " . implode( ' AND ', $where ) . '
@@ -998,7 +1064,7 @@ class WPAgent_Repository {
 		if ( empty( $candidates ) ) {
 			$candidates = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT c.*, s.title AS source_title, s.filename, s.url, s.mime
+					"SELECT c.*, s.title AS source_title, s.filename, s.url, s.mime, s.metadata AS source_metadata
 					FROM {$chunks} c
 					INNER JOIN {$sources} s ON s.id = c.source_id
 					WHERE c.agent_slug = %s AND s.status = 'indexed'
@@ -1014,6 +1080,22 @@ class WPAgent_Repository {
 		$ranked = array();
 
 		foreach ( $candidates as $candidate ) {
+			if ( ! empty( $candidate['source_metadata'] ) ) {
+				$meta = is_array( $candidate['source_metadata'] ) ? $candidate['source_metadata'] : json_decode( $candidate['source_metadata'], true );
+				if ( is_array( $meta ) && ! empty( $meta['scope'] ) ) {
+					$scope = $meta['scope'];
+					if ( 'conversation' === $scope ) {
+						if ( empty( $conversation_id ) || ( $meta['conversation_id'] ?? '' ) !== $conversation_id ) {
+							continue;
+						}
+					} elseif ( 'project' === $scope ) {
+						if ( empty( $project_id ) || absint( $meta['project_id'] ?? 0 ) !== absint( $project_id ) ) {
+							continue;
+						}
+					}
+				}
+			}
+
 			$haystack = $this->normalize_search_text( $candidate['source_title'] . ' ' . $candidate['keywords'] . ' ' . $candidate['content'] );
 			$score    = 0;
 
@@ -1128,26 +1210,62 @@ class WPAgent_Repository {
 		);
 	}
 
+	public function ensure_email_schedules_tables_exist() {
+		global $wpdb;
+
+		$schedules_table     = $wpdb->prefix . 'wpagent_email_schedules';
+		$subscriptions_table = $wpdb->prefix . 'wpagent_email_subscriptions';
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $schedules_table ) ) !== $schedules_table ||
+			$wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $subscriptions_table ) ) !== $subscriptions_table ) {
+			if ( ! class_exists( 'WPAgent_Activator' ) ) {
+				require_once WPAGENT_PATH . 'includes/class-wpagent-activator.php';
+			}
+			WPAgent_Activator::activate();
+		}
+
+		$col_steps = $wpdb->get_results( "SHOW COLUMNS FROM `{$schedules_table}` LIKE 'sequence_steps'" );
+		if ( empty( $col_steps ) ) {
+			$wpdb->query( "ALTER TABLE `{$schedules_table}` ADD COLUMN sequence_steps longtext NULL AFTER frequency" );
+			$wpdb->query( "ALTER TABLE `{$schedules_table}` ADD COLUMN consent_required tinyint unsigned NOT NULL DEFAULT 0 AFTER content_prompt" );
+			$wpdb->query( "ALTER TABLE `{$schedules_table}` ADD COLUMN origin varchar(20) NOT NULL DEFAULT '' AFTER status" );
+			$wpdb->query( "ALTER TABLE `{$schedules_table}` ADD COLUMN signature varchar(64) NOT NULL DEFAULT '' AFTER origin" );
+			$wpdb->query( "ALTER TABLE `{$schedules_table}` ADD COLUMN metadata longtext NULL AFTER total_sends" );
+		}
+
+		$wpdb->query( "UPDATE `{$subscriptions_table}` SET status = 'active' WHERE status = 'subscribed'" );
+	}
+
 	public function create_email_schedule( $data ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_schedules';
+		if ( isset( $data['sequence_steps'] ) && is_array( $data['sequence_steps'] ) ) {
+			$data['sequence_steps'] = wp_json_encode( $data['sequence_steps'], JSON_UNESCAPED_UNICODE );
+		}
+		if ( isset( $data['metadata'] ) && is_array( $data['metadata'] ) ) {
+			$data['metadata'] = wp_json_encode( $data['metadata'], JSON_UNESCAPED_UNICODE );
+		}
 		$wpdb->insert( $table, $data );
 		return $wpdb->insert_id;
 	}
 
 	public function get_email_schedule( $id ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_schedules';
-		return $wpdb->get_row(
+		$row   = $wpdb->get_row(
 			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ),
 			ARRAY_A
 		);
+		return $row ? $this->decode_schedule_data( $row ) : null;
 	}
 
 	public function get_email_schedule_by_signature( $agent_slug, $signature ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_schedules';
-		return $wpdb->get_row(
+		$row   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT * FROM {$table} WHERE agent_slug = %s AND signature = %s",
 				$agent_slug,
@@ -1155,22 +1273,32 @@ class WPAgent_Repository {
 			),
 			ARRAY_A
 		);
+		return $row ? $this->decode_schedule_data( $row ) : null;
 	}
 
 	public function update_email_schedule( $id, $data ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_schedules';
+		if ( isset( $data['sequence_steps'] ) && is_array( $data['sequence_steps'] ) ) {
+			$data['sequence_steps'] = wp_json_encode( $data['sequence_steps'], JSON_UNESCAPED_UNICODE );
+		}
+		if ( isset( $data['metadata'] ) && is_array( $data['metadata'] ) ) {
+			$data['metadata'] = wp_json_encode( $data['metadata'], JSON_UNESCAPED_UNICODE );
+		}
 		return $wpdb->update( $table, $data, array( 'id' => $id ) );
 	}
 
 	public function delete_email_schedule( $id ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_schedules';
 		return $wpdb->delete( $table, array( 'id' => $id ) );
 	}
 
 	public function list_email_schedules( $args = array() ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_schedules';
 		$where = '1=1';
 		if ( ! empty( $args['agent_slug'] ) ) {
@@ -1180,12 +1308,43 @@ class WPAgent_Repository {
 			$where .= $wpdb->prepare( ' AND status = %s', $args['status'] );
 		}
 		$order = 'ORDER BY updated_at DESC';
-		return $wpdb->get_results( "SELECT * FROM {$table} WHERE {$where} {$order}", ARRAY_A );
+		$rows  = $wpdb->get_results( "SELECT * FROM {$table} WHERE {$where} {$order}", ARRAY_A );
+		if ( $rows ) {
+			foreach ( $rows as &$row ) {
+				$row = $this->decode_schedule_data( $row );
+			}
+		}
+		return $rows ?: array();
+	}
+
+	private function decode_schedule_data( $row ) {
+		if ( isset( $row['sequence_steps'] ) && is_string( $row['sequence_steps'] ) ) {
+			$decoded = json_decode( $row['sequence_steps'], true );
+			$row['sequence_steps'] = is_array( $decoded ) ? $decoded : array();
+		} elseif ( ! isset( $row['sequence_steps'] ) ) {
+			$row['sequence_steps'] = array();
+		}
+
+		if ( isset( $row['metadata'] ) && is_string( $row['metadata'] ) ) {
+			$decoded = json_decode( $row['metadata'], true );
+			$row['metadata'] = is_array( $decoded ) ? $decoded : array();
+		} elseif ( ! isset( $row['metadata'] ) ) {
+			$row['metadata'] = array();
+		}
+
+		return $row;
 	}
 
 	public function create_email_subscription( $data ) {
 		global $wpdb;
+		$this->ensure_email_schedules_tables_exist();
 		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
+		if ( empty( $data['unsubscribe_token'] ) ) {
+			$data['unsubscribe_token'] = wp_generate_password( 32, false );
+		}
+		if ( isset( $data['metadata'] ) && is_array( $data['metadata'] ) ) {
+			$data['metadata'] = wp_json_encode( $data['metadata'], JSON_UNESCAPED_UNICODE );
+		}
 		$wpdb->insert( $table, $data );
 		return $wpdb->insert_id;
 	}
@@ -1193,7 +1352,7 @@ class WPAgent_Repository {
 	public function get_email_subscription_by_email( $schedule_id, $email ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
-		return $wpdb->get_row(
+		$row   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT * FROM {$table} WHERE schedule_id = %d AND recipient_email = %s",
 				$schedule_id,
@@ -1201,31 +1360,37 @@ class WPAgent_Repository {
 			),
 			ARRAY_A
 		);
+		return $row ? $this->decode_subscription_data( $row ) : null;
 	}
 
 	public function get_email_subscription_by_token( $token ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
-		return $wpdb->get_row(
+		$row   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT * FROM {$table} WHERE unsubscribe_token = %s",
 				$token
 			),
 			ARRAY_A
 		);
+		return $row ? $this->decode_subscription_data( $row ) : null;
 	}
 
 	public function update_email_subscription( $id, $data ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
+		if ( isset( $data['metadata'] ) && is_array( $data['metadata'] ) ) {
+			$data['metadata'] = wp_json_encode( $data['metadata'], JSON_UNESCAPED_UNICODE );
+		}
 		return $wpdb->update( $table, $data, array( 'id' => $id ) );
 	}
 
 	public function get_due_email_subscriptions( $per_run = 30 ) {
 		global $wpdb;
-		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
+		$table           = $wpdb->prefix . 'wpagent_email_subscriptions';
 		$schedules_table = $wpdb->prefix . 'wpagent_email_schedules';
-		return $wpdb->get_results(
+		$now             = wp_date( 'Y-m-d H:i:s' );
+		$rows            = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT s.*
 				FROM {$table} s
@@ -1233,40 +1398,74 @@ class WPAgent_Repository {
 				WHERE s.consent_status = 'subscribed'
 					AND s.status = 'active'
 					AND sch.status = 'active'
-					AND (s.next_send_at IS NULL OR s.next_send_at <= NOW())
+					AND s.next_send_at IS NOT NULL
+					AND s.next_send_at <= %s
 				ORDER BY s.next_send_at ASC
 				LIMIT %d",
+				$now,
 				$per_run
 			),
 			ARRAY_A
 		);
+		if ( $rows ) {
+			foreach ( $rows as &$row ) {
+				$row = $this->decode_subscription_data( $row );
+			}
+		}
+		return $rows ?: array();
 	}
 
 	public function list_email_subscriptions( $schedule_id, $args = array() ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
 		$where = $wpdb->prepare( 'schedule_id = %d', $schedule_id );
-		if ( ! empty( $args['status'] ) ) {
-			$where .= $wpdb->prepare( ' AND status = %s', $args['status'] );
+
+		$filter = $args['filter'] ?? ( $args['status'] ?? '' );
+		if ( 'active' === $filter ) {
+			$where .= " AND status = 'active' AND consent_status = 'subscribed'";
+		} elseif ( 'completed' === $filter ) {
+			$where .= " AND status = 'completed'";
+		} elseif ( 'unsubscribed' === $filter ) {
+			$where .= " AND consent_status = 'unsubscribed'";
 		}
+
 		$limit = '';
 		if ( ! empty( $args['limit'] ) ) {
 			$limit = $wpdb->prepare( ' LIMIT %d', $args['limit'] );
 		}
 		$order = 'ORDER BY subscribed_at DESC';
-		return $wpdb->get_results( "SELECT * FROM {$table} WHERE {$where} {$order} {$limit}", ARRAY_A );
+		$rows  = $wpdb->get_results( "SELECT * FROM {$table} WHERE {$where} {$order} {$limit}", ARRAY_A );
+		if ( $rows ) {
+			foreach ( $rows as &$row ) {
+				$row = $this->decode_subscription_data( $row );
+			}
+		}
+		return $rows ?: array();
 	}
 
-	public function count_email_subscriptions( $schedule_id, $status = 'subscribed' ) {
+	private function decode_subscription_data( $row ) {
+		if ( isset( $row['metadata'] ) && is_string( $row['metadata'] ) ) {
+			$decoded = json_decode( $row['metadata'], true );
+			$row['metadata'] = is_array( $decoded ) ? $decoded : array();
+		} elseif ( ! isset( $row['metadata'] ) ) {
+			$row['metadata'] = array();
+		}
+		return $row;
+	}
+
+	public function count_email_subscriptions( $schedule_id, $filter = 'all' ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wpagent_email_subscriptions';
-		return (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE schedule_id = %d AND status = %s",
-				$schedule_id,
-				$status
-			)
-		);
+		if ( 'active' === $filter ) {
+			$sql = $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE schedule_id = %d AND status = 'active' AND consent_status = 'subscribed'", $schedule_id );
+		} elseif ( 'completed' === $filter ) {
+			$sql = $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE schedule_id = %d AND status = 'completed'", $schedule_id );
+		} elseif ( 'unsubscribed' === $filter ) {
+			$sql = $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE schedule_id = %d AND consent_status = 'unsubscribed'", $schedule_id );
+		} else {
+			$sql = $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE schedule_id = %d", $schedule_id );
+		}
+		return (int) $wpdb->get_var( $sql );
 	}
 
 	public function upsert_conversation_summary( $data ) {
@@ -1361,8 +1560,8 @@ class WPAgent_Repository {
 		$conv_table   = $wpdb->prefix . 'wpagent_conversations';
 		$int_table    = $wpdb->prefix . 'wpagent_interactions';
 		$summ_table   = $wpdb->prefix . 'wpagent_conversation_summaries';
-		$gmt_offset   = (float) get_option( 'gmt_offset', 0 );
-		$cutoff       = gmdate( 'Y-m-d H:i:s', time() + $gmt_offset * 3600 - $delay_hours * 3600 );
+		$delay_seconds= max( 1, absint( $delay_hours ) ) * HOUR_IN_SECONDS;
+		$cutoff       = wp_date( 'Y-m-d H:i:s', time() - $delay_seconds );
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT c.id, c.conversation_id, c.user_id, c.agent_slug, c.title, c.updated_at,
@@ -1370,7 +1569,7 @@ class WPAgent_Repository {
 					COALESCE(agg.last_interaction_id, 0) AS last_interaction_id,
 					COALESCE(agg.last_interaction_at, '') AS last_interaction_at
 				FROM {$conv_table} c
-				LEFT JOIN (
+				INNER JOIN (
 					SELECT conversation_id, agent_slug,
 						COUNT(DISTINCT id) AS interaction_count,
 						MAX(id) AS last_interaction_id,
@@ -1381,7 +1580,8 @@ class WPAgent_Repository {
 				LEFT JOIN {$summ_table} s ON c.conversation_id = s.conversation_id AND c.agent_slug = s.agent_slug
 				WHERE c.agent_slug = %s
 					AND c.updated_at <= %s
-					AND s.id IS NULL
+					AND agg.interaction_count >= 2
+					AND ( s.id IS NULL OR s.last_interaction_id < agg.last_interaction_id )
 				ORDER BY c.updated_at ASC
 				LIMIT %d",
 				$agent_slug,
@@ -1524,6 +1724,325 @@ class WPAgent_Repository {
 		);
 
 		return $results ?: array();
+	}
+
+	// Projects / Workspace Tabs Management
+	public function ensure_projects_table_exists() {
+		global $wpdb;
+
+		$table           = $wpdb->prefix . 'wpagent_projects';
+		$conversations   = $wpdb->prefix . 'wpagent_conversations';
+		$charset_collate = $wpdb->get_charset_collate();
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			if ( ! function_exists( 'dbDelta' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+			}
+			$sql = "CREATE TABLE {$table} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+				agent_slug varchar(120) NOT NULL DEFAULT 'default',
+				name varchar(190) NOT NULL DEFAULT '',
+				profile_data longtext NULL,
+				is_default tinyint(1) NOT NULL DEFAULT 0,
+				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY  (id),
+				KEY user_agent (user_id, agent_slug)
+			) {$charset_collate};";
+			dbDelta( $sql );
+		}
+
+		$col_exists = $wpdb->get_results( "SHOW COLUMNS FROM `{$conversations}` LIKE 'project_id'" );
+		if ( empty( $col_exists ) ) {
+			$wpdb->query( "ALTER TABLE `{$conversations}` ADD COLUMN project_id bigint(20) unsigned NULL DEFAULT NULL AFTER agent_slug" );
+			$wpdb->query( "ALTER TABLE `{$conversations}` ADD KEY user_agent_project (user_id, agent_slug, project_id, updated_at)" );
+		}
+	}
+
+	public function create_project( $user_id, $agent_slug, $name, $profile_data = array(), $is_default = 0 ) {
+		global $wpdb;
+
+		$this->ensure_projects_table_exists();
+		$table = $wpdb->prefix . 'wpagent_projects';
+		$name  = sanitize_text_field( $name ? $name : __( 'Novo projeto', 'wpagent' ) );
+
+		$wpdb->insert(
+			$table,
+			array(
+				'user_id'      => absint( $user_id ),
+				'agent_slug'   => sanitize_key( $agent_slug ),
+				'name'         => $name,
+				'profile_data' => wp_json_encode( is_array( $profile_data ) ? $profile_data : array() ),
+				'is_default'   => absint( $is_default ),
+				'created_at'   => current_time( 'mysql' ),
+				'updated_at'   => current_time( 'mysql' ),
+			),
+			array( '%d', '%s', '%s', '%s', '%d', '%s', '%s' )
+		);
+
+		$project_id = (int) $wpdb->insert_id;
+		return $this->get_project( $project_id, $user_id, $agent_slug );
+	}
+
+	public function get_project( $project_id, $user_id = 0, $agent_slug = '' ) {
+		global $wpdb;
+
+		$this->ensure_projects_table_exists();
+		$table = $wpdb->prefix . 'wpagent_projects';
+		$where = array( 'id = %d' );
+		$args  = array( absint( $project_id ) );
+
+		if ( $user_id > 0 ) {
+			$where[] = 'user_id = %d';
+			$args[]  = absint( $user_id );
+		}
+		if ( $agent_slug ) {
+			$where[] = 'agent_slug = %s';
+			$args[]  = sanitize_key( $agent_slug );
+		}
+
+		$sql = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where );
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+
+		if ( $row ) {
+			$row['profile_data'] = ! empty( $row['profile_data'] ) ? json_decode( $row['profile_data'], true ) : array();
+		}
+
+		return $row;
+	}
+
+	public function list_projects( $user_id, $agent_slug ) {
+		global $wpdb;
+
+		$this->ensure_projects_table_exists();
+		$table = $wpdb->prefix . 'wpagent_projects';
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE user_id = %d AND agent_slug = %s ORDER BY is_default DESC, id ASC",
+				absint( $user_id ),
+				sanitize_key( $agent_slug )
+			),
+			ARRAY_A
+		);
+
+		if ( empty( $rows ) ) {
+			$default_proj = $this->create_project( $user_id, $agent_slug, __( 'Geral', 'wpagent' ), array(), 1 );
+			return array( $default_proj );
+		}
+
+		foreach ( $rows as &$row ) {
+			$row['profile_data'] = ! empty( $row['profile_data'] ) ? json_decode( $row['profile_data'], true ) : array();
+		}
+
+		return $rows;
+	}
+
+	public function update_project( $project_id, $user_id, $agent_slug, $data ) {
+		global $wpdb;
+
+		$this->ensure_projects_table_exists();
+		$table = $wpdb->prefix . 'wpagent_projects';
+		$update_fields = array( 'updated_at' => current_time( 'mysql' ) );
+		$format        = array( '%s' );
+
+		if ( isset( $data['name'] ) ) {
+			$update_fields['name'] = sanitize_text_field( $data['name'] );
+			$format[] = '%s';
+		}
+		if ( isset( $data['profile_data'] ) ) {
+			$update_fields['profile_data'] = wp_json_encode( is_array( $data['profile_data'] ) ? $data['profile_data'] : array() );
+			$format[] = '%s';
+		}
+
+		$wpdb->update(
+			$table,
+			$update_fields,
+			array(
+				'id'         => absint( $project_id ),
+				'user_id'    => absint( $user_id ),
+				'agent_slug' => sanitize_key( $agent_slug ),
+			),
+			$format,
+			array( '%d', '%d', '%s' )
+		);
+
+		return $this->get_project( $project_id, $user_id, $agent_slug );
+	}
+
+	public function delete_project( $project_id, $user_id, $agent_slug, $delete_conversations = false ) {
+		global $wpdb;
+
+		$this->ensure_projects_table_exists();
+		$projects_table      = $wpdb->prefix . 'wpagent_projects';
+		$conversations_table = $wpdb->prefix . 'wpagent_conversations';
+
+		$project = $this->get_project( $project_id, $user_id, $agent_slug );
+		if ( ! $project ) {
+			return false;
+		}
+
+		$wpdb->delete(
+			$projects_table,
+			array(
+				'id'         => absint( $project_id ),
+				'user_id'    => absint( $user_id ),
+				'agent_slug' => sanitize_key( $agent_slug ),
+			),
+			array( '%d', '%d', '%s' )
+		);
+
+		if ( $delete_conversations ) {
+			$wpdb->update(
+				$conversations_table,
+				array( 'status' => 'deleted', 'updated_at' => current_time( 'mysql' ) ),
+				array(
+					'user_id'    => absint( $user_id ),
+					'agent_slug' => sanitize_key( $agent_slug ),
+					'project_id' => absint( $project_id ),
+				),
+				array( '%s', '%s' ),
+				array( '%d', '%s', '%d' )
+			);
+		} else {
+			$wpdb->update(
+				$conversations_table,
+				array( 'project_id' => null ),
+				array(
+					'user_id'    => absint( $user_id ),
+					'agent_slug' => sanitize_key( $agent_slug ),
+					'project_id' => absint( $project_id ),
+				),
+				array( null ),
+				array( '%d', '%s', '%d' )
+			);
+		}
+
+		return true;
+	}
+
+	public function ensure_periodic_contents_table_exists() {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'wpagent_periodic_contents';
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			if ( ! class_exists( 'WPAgent_Activator' ) ) {
+				require_once WPAGENT_PATH . 'includes/class-wpagent-activator.php';
+			}
+			WPAgent_Activator::activate();
+		}
+	}
+
+	public function create_periodic_content( $data ) {
+		global $wpdb;
+		$this->ensure_periodic_contents_table_exists();
+		$table = $wpdb->prefix . 'wpagent_periodic_contents';
+
+		$wpdb->insert(
+			$table,
+			array(
+				'name'          => sanitize_text_field( $data['name'] ?? '' ),
+				'agent_slug'    => sanitize_key( $data['agent_slug'] ?? 'default' ),
+				'prompt'        => wp_kses_post( $data['prompt'] ?? '' ),
+				'frequency'     => sanitize_key( $data['frequency'] ?? 'daily' ),
+				'post_category' => absint( $data['post_category'] ?? 1 ),
+				'status'        => sanitize_key( $data['status'] ?? 'active' ),
+				'last_run_at'   => $data['last_run_at'] ?? null,
+				'next_run_at'   => $data['next_run_at'] ?? null,
+				'last_post_id'  => absint( $data['last_post_id'] ?? 0 ),
+				'created_at'    => current_time( 'mysql' ),
+				'updated_at'    => current_time( 'mysql' ),
+			)
+		);
+
+		return (int) $wpdb->insert_id;
+	}
+
+	public function update_periodic_content( $id, $data ) {
+		global $wpdb;
+		$this->ensure_periodic_contents_table_exists();
+		$table = $wpdb->prefix . 'wpagent_periodic_contents';
+
+		$payload = array();
+		if ( isset( $data['name'] ) ) {
+			$payload['name'] = sanitize_text_field( $data['name'] );
+		}
+		if ( isset( $data['agent_slug'] ) ) {
+			$payload['agent_slug'] = sanitize_key( $data['agent_slug'] );
+		}
+		if ( isset( $data['prompt'] ) ) {
+			$payload['prompt'] = wp_kses_post( $data['prompt'] );
+		}
+		if ( isset( $data['frequency'] ) ) {
+			$payload['frequency'] = sanitize_key( $data['frequency'] );
+		}
+		if ( isset( $data['post_category'] ) ) {
+			$payload['post_category'] = absint( $data['post_category'] );
+		}
+		if ( isset( $data['status'] ) ) {
+			$payload['status'] = sanitize_key( $data['status'] );
+		}
+		if ( array_key_exists( 'last_run_at', $data ) ) {
+			$payload['last_run_at'] = $data['last_run_at'];
+		}
+		if ( array_key_exists( 'next_run_at', $data ) ) {
+			$payload['next_run_at'] = $data['next_run_at'];
+		}
+		if ( isset( $data['last_post_id'] ) ) {
+			$payload['last_post_id'] = absint( $data['last_post_id'] );
+		}
+		$payload['updated_at'] = current_time( 'mysql' );
+
+		return false !== $wpdb->update(
+			$table,
+			$payload,
+			array( 'id' => absint( $id ) )
+		);
+	}
+
+	public function get_periodic_content( $id ) {
+		global $wpdb;
+		$this->ensure_periodic_contents_table_exists();
+		$table = $wpdb->prefix . 'wpagent_periodic_contents';
+
+		return $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", absint( $id ) ),
+			ARRAY_A
+		);
+	}
+
+	public function list_periodic_contents( $args = array() ) {
+		global $wpdb;
+		$this->ensure_periodic_contents_table_exists();
+		$table = $wpdb->prefix . 'wpagent_periodic_contents';
+
+		$where = 'WHERE 1=1';
+		$params = array();
+
+		if ( ! empty( $args['status'] ) ) {
+			$where .= ' AND status = %s';
+			$params[] = sanitize_key( $args['status'] );
+		}
+
+		$sql = "SELECT * FROM {$table} {$where} ORDER BY id DESC";
+		if ( ! empty( $params ) ) {
+			$sql = $wpdb->prepare( $sql, $params );
+		}
+
+		return $wpdb->get_results( $sql, ARRAY_A );
+	}
+
+	public function delete_periodic_content( $id ) {
+		global $wpdb;
+		$this->ensure_periodic_contents_table_exists();
+		$table = $wpdb->prefix . 'wpagent_periodic_contents';
+
+		return (bool) $wpdb->delete(
+			$table,
+			array( 'id' => absint( $id ) ),
+			array( '%d' )
+		);
 	}
 }
 }

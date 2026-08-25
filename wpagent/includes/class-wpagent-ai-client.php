@@ -11,14 +11,14 @@ class WPAgent_AI_Client {
 	private $agents;
 	private $prompt_builder;
 
-	public function __construct( WPAgent_Repository $repository, WPAgent_Settings $settings, WPAgent_Agents $agents, ?WPAgent_Embeddings $embeddings = null, ?WPAgent_Admin_Abilities $admin_abilities = null, ?WPAgent_Email_Actions $email_actions = null ) {
+	public function __construct( WPAgent_Repository $repository, WPAgent_Settings $settings, WPAgent_Agents $agents, ?WPAgent_Embeddings $embeddings = null, ?WPAgent_Admin_Abilities $admin_abilities = null, ?WPAgent_Email_Actions $email_actions = null, ?WPAgent_Email_Schedules $email_schedules = null ) {
 		$this->repository     = $repository;
 		$this->settings       = $settings;
 		$this->agents         = $agents;
-		$this->prompt_builder = new WPAgent_Prompt_Builder( $repository, $settings, $agents, $embeddings, $admin_abilities, $email_actions );
+		$this->prompt_builder = new WPAgent_Prompt_Builder( $repository, $settings, $agents, $embeddings, $admin_abilities, $email_actions, $email_schedules );
 	}
 
-	public function chat( $message, $user_id, $agent_slug, $conversation_id = '', $session_id = '' ) {
+	public function chat( $message, $user_id, $agent_slug, $conversation_id = '', $session_id = '', $project_id = null ) {
 		$user_id = absint( $user_id );
 		$tokens_needed = 100;
 		$can_use = $this->repository->can_user_use_tokens( $user_id, $tokens_needed );
@@ -27,7 +27,7 @@ class WPAgent_AI_Client {
 			return new WP_Error( 'wpagent_token_limit_reached', __( 'Você atingiu o limite mensal de tokens. Tente novamente em 30 dias ou fale com o administrador.', 'wpagent' ), array( 'status' => 429 ) );
 	}
 
-		$prompt = $this->prompt_builder->build( $message, $user_id, $agent_slug, $conversation_id, $session_id );
+		$prompt = $this->prompt_builder->build( $message, $user_id, $agent_slug, $conversation_id, $session_id, $project_id );
 		$agent  = $prompt['agent'];
 
 		if ( 'wordpress_ai' === ( $agent['provider_mode'] ?? '' ) ) {
@@ -114,10 +114,12 @@ class WPAgent_AI_Client {
 
 		$model = $agent['openrouter_model'] ?: $this->settings->get( 'openrouter_model', 'openai/gpt-4.1-mini' );
 
+		$timeout = (int) apply_filters( 'wpagent_ai_request_timeout', absint( $this->settings->get( 'ai_request_timeout', 30 ) ) );
+
 		$response = wp_remote_post(
 			'https://openrouter.ai/api/v1/chat/completions',
 			array(
-				'timeout' => $this->request_timeout( 'chat' ),
+				'timeout' => $timeout,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $api_key,
 					'Content-Type'  => 'application/json',

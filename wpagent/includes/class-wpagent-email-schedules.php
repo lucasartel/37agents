@@ -20,7 +20,9 @@ class WPAgent_Email_Schedules {
 	}
 
 	public function register() {
+		add_filter( 'cron_schedules', array( $this, 'cron_schedules' ) );
 		add_action( 'init', array( $this, 'maybe_schedule_cron' ) );
+		add_action( 'init', array( $this, 'maybe_process_due_on_request' ), 20 );
 		add_action( self::CRON_HOOK, array( $this, 'process_due' ) );
 		add_action( 'init', array( $this, 'maybe_handle_unsubscribe' ), 5 );
 
@@ -32,43 +34,94 @@ class WPAgent_Email_Schedules {
 		}
 	}
 
+	public function cron_schedules( $schedules ) {
+		if ( ! isset( $schedules['wpagent_five_minutes'] ) ) {
+			$schedules['wpagent_five_minutes'] = array(
+				'interval' => 300,
+				'display'  => __( 'A cada 5 minutos (WPAgents)', 'wpagent' ),
+			);
+		}
+		return $schedules;
+	}
+
 	public function maybe_schedule_cron() {
 		$next = wp_next_scheduled( self::CRON_HOOK );
 		if ( ! $next ) {
-			wp_schedule_event( time() + 120, 'hourly', self::CRON_HOOK );
+			wp_schedule_event( time() + 60, 'wpagent_five_minutes', self::CRON_HOOK );
+		}
+	}
+
+	public function maybe_process_due_on_request() {
+		$last_check = (int) get_transient( 'wpagent_last_drip_check' );
+		if ( ( time() - $last_check ) < 60 ) {
+			return;
+		}
+		set_transient( 'wpagent_last_drip_check', time(), 120 );
+
+		$due = $this->repository->get_due_email_subscriptions( 5 );
+		if ( ! empty( $due ) ) {
+			$this->process_due();
 		}
 	}
 
 	public function enabled_for_agent( $agent ) {
-		return '1' === ( $agent['email_schedules_enabled'] ?? '0' );
+		if ( is_string( $agent ) ) {
+			$agent = $this->agents->get_agent( $agent );
+		}
+		if ( ! is_array( $agent ) ) {
+			return false;
+		}
+		return '1' === ( $agent['email_actions_enabled'] ?? '0' ) || '1' === ( $agent['email_schedules_enabled'] ?? '0' );
 	}
 
 	public function prompt_context( $agent ) {
+		// Recurso de Agendamentos Drip temporariamente desativado para a v0.5.9
+		return '';
+		/*
 		if ( ! $this->enabled_for_agent( $agent ) ) {
 			return '';
 		}
 
 		$lines = array(
-			'E-mails recorrentes e programados autorizados pelo administrador:',
-			'- Quando as instrucoes deste agente definirem envios recorrentes (ex.: semanal, mensal) ou uma sequencia (ex.: um e-mail hoje e outro daqui a 3 dias), voce pode propor um agendamento.',
-			'- So proponha o agendamento depois de coletar o e-mail do destinatario e o consentimento explicito para receber os envios programados.',
-			'- Para envios recorrentes, defina o tipo como "recurring" e a frequencia (daily, weekly ou monthly). Para sequencias, use o tipo "sequence" com a lista de passos em horas a partir da inscricao.',
-			'- O campo content_prompt descreve como cada e-mail deve ser gerado na hora do envio. O campo subject_template pode usar {{nome}} e {{email}}.',
-			'- Nunca diga que enviou ou agendou sozinho. O sistema so agenda apos o usuario confirmar no botao do WPAgent.',
-			'- Se faltar e-mail valido ou consentimento, pergunte antes. Se o usuario nao quiser envios recorrentes, nao proponha o agendamento.',
-			'- Ao propor, termine a resposta com um bloco de JSON valido exatamente neste formato:',
-			'```wpagent-email-schedule',
-			'{"name":"Resumo semanal","type":"recurring","frequency":"weekly","subject_template":"Seu resumo, {{nome}}","content_prompt":"Escreva um resumo util...","to_email":"email@exemplo.com","to_name":"Nome","consent_note":"Usuario autorizou envios semanais","max_occurrences":0}',
-			'```',
-			'- Para sequencia (drip), use "type":"sequence" e "steps":[{"offset_hours":0,"label":"Boas-vindas"},{"offset_hours":72,"label":"Follow-up"}].',
+			'Sequências de E-mails Programados (Drip) autorizados pelo administrador:',
+			'- O administrador configurou sequências programadas de e-mails (Drip) no painel. Quando o visitante se interessar e aceitar receber (por exemplo, dizendo "sim", "quero", "pode enviar" ou fornecendo o e-mail), você deve propor e inscrever o usuário na sequência.',
+			'- Peça o e-mail do visitante se ele ainda não informou. Quando ele aceitar ou concordar (ex: "sim"), confirme amigavelmente no seu texto (ex: "Inscrição confirmada para seu e-mail!") e anexe o bloco JSON do agendamento.',
+			'- IMPORTANTE: Não peça para o visitante clicar em botões. Quando ele disser "sim" ou aceitar a oferta, a inscrição é confirmada e registrada automaticamente pelo WPAgents.',
+			'- Nunca invente novos passos de envio, assuntos ou e-mails soltos que não estejam cadastrados na lista oficial do administrador.',
 		);
 
+		$active_schedules = $this->repository->list_email_schedules( array( 'agent_slug' => $agent['slug'], 'status' => 'active' ) );
+		if ( ! empty( $active_schedules ) ) {
+			$lines[] = 'Sequências de E-mail (Drip) cadastradas no admin para este agente (USE APENAS ESTAS):';
+			foreach ( $active_schedules as $sched ) {
+				$info = '- ID: ' . (int) $sched['id'] . ' | Nome: "' . $sched['name'] . '"';
+				$steps = is_array( $sched['sequence_steps'] ) ? $sched['sequence_steps'] : json_decode( $sched['sequence_steps'] ?? '', true );
+				if ( is_array( $steps ) && ! empty( $steps ) ) {
+					$labels = array_map( static function( $s ) { return ( $s['offset_hours'] ?? 0 ) . 'h (' . ( $s['label'] ?? '' ) . ')'; }, $steps );
+					$info .= ' | Passos configurados: ' . implode( ', ', $labels );
+				}
+				$lines[] = $info;
+			}
+			$lines[] = 'REGRA: Quando o usuário aceitar se inscrever, você DEVE referenciar o agendamento enviando o seu respectivo ID (schedule_id) e Nome.';
+		}
+
+		$lines[] = '- Ao confirmar a inscrição, inclua no final da sua resposta o bloco de JSON válido exatamente neste formato:';
+		$lines[] = '```wpagent-email-schedule';
+		$lines[] = '{"schedule_id":1,"name":"Nome da Sequencia","to_email":"email@exemplo.com","to_name":"Nome do Visitante","consent_note":"Usuario autorizou o recebimento da sequencia no chat"}';
+		$lines[] = '```';
+
 		return implode( "\n", $lines );
+		*/
 	}
 
-	public function extract_schedule_proposal( $reply, $agent ) {
+	public function extract_schedule_proposal( $reply, $agent, $context = array() ) {
+		$clean_reply = trim( preg_replace( '/```wpagent-email-schedule\s*[\s\S]*?\s*```/s', '', (string) $reply ) );
+
 		if ( ! $this->enabled_for_agent( $agent ) ) {
-			return null;
+			return array(
+				'reply'    => $clean_reply,
+				'proposal' => null,
+			);
 		}
 
 		if ( ! preg_match( '/```wpagent-email-schedule\s*([\s\S]*?)\s*```/s', (string) $reply, $matches ) ) {
@@ -77,28 +130,67 @@ class WPAgent_Email_Schedules {
 
 		$data = json_decode( trim( $matches[1] ), true );
 		if ( ! is_array( $data ) ) {
-			return null;
+			return array(
+				'reply'    => $clean_reply,
+				'proposal' => null,
+			);
 		}
 
 		$proposal = $this->prepare_schedule_proposal( $data, $agent );
 		if ( is_wp_error( $proposal ) ) {
-			return null;
+			return array(
+				'reply'    => $clean_reply,
+				'proposal' => null,
+			);
 		}
 
-		$clean_reply = trim( preg_replace( '/```wpagent-email-schedule\s*[\s\S]*?\s*```/s', '', (string) $reply ) );
 		if ( '' === $clean_reply ) {
-			$clean_reply = __( 'Preparei um agendamento de e-mails para sua confirmacao.', 'wpagent' );
+			$clean_reply = __( 'Inscrição de e-mails agendada com sucesso.', 'wpagent' );
+		}
+
+		// Auto-confirm subscription seamlessly when to_email is valid
+		$confirm_result = null;
+		if ( ! empty( $proposal['to_email'] ) && is_email( $proposal['to_email'] ) ) {
+			$confirm_result = $this->confirm( $proposal, $agent, $context );
 		}
 
 		return array(
-			'reply'    => $clean_reply,
-			'proposal' => $proposal,
+			'reply'          => $clean_reply,
+			'proposal'       => $proposal,
+			'auto_confirmed' => ! empty( $confirm_result ) && ! is_wp_error( $confirm_result ),
+			'confirm_result' => is_wp_error( $confirm_result ) ? null : $confirm_result,
 		);
 	}
 
 	public function prepare_schedule_proposal( $data, $agent ) {
+		$schedule_id = absint( $data['schedule_id'] ?? 0 );
+		$existing_schedule = null;
+		if ( $schedule_id > 0 ) {
+			$existing_schedule = $this->repository->get_email_schedule( $schedule_id );
+		}
+		if ( ! $existing_schedule && ! empty( $data['name'] ) ) {
+			$all_schedules = $this->repository->list_email_schedules( array( 'agent_slug' => $agent['slug'], 'status' => 'active' ) );
+			foreach ( $all_schedules as $sched ) {
+				if ( strcasecmp( trim( $sched['name'] ), trim( $data['name'] ) ) === 0 ) {
+					$existing_schedule = $sched;
+					break;
+				}
+			}
+		}
+
+		if ( $existing_schedule ) {
+			$data['name']             = $existing_schedule['name'];
+			$data['type']             = 'sequence';
+			$data['schedule_type']    = 'sequence';
+			$data['frequency']        = 'weekly';
+			$data['sequence_steps']   = is_array( $existing_schedule['sequence_steps'] ) ? $existing_schedule['sequence_steps'] : json_decode( $existing_schedule['sequence_steps'] ?? '', true );
+			$data['subject_template'] = $existing_schedule['subject_template'];
+			$data['content_prompt']   = $existing_schedule['content_prompt'];
+			$data['max_occurrences']  = absint( $existing_schedule['max_occurrences'] );
+		}
+
 		$type = $data['type'] ?? $data['schedule_type'] ?? '';
-		$type = in_array( $type, array( 'recurring', 'sequence' ), true ) ? $type : 'recurring';
+		$type = in_array( $type, array( 'recurring', 'sequence' ), true ) ? $type : 'sequence';
 		$frequency = $data['frequency'] ?? '';
 		$frequency = in_array( $frequency, self::RECURRING_FREQUENCIES, true ) ? $frequency : 'weekly';
 
@@ -121,6 +213,14 @@ class WPAgent_Email_Schedules {
 			} );
 		}
 
+		if ( 'sequence' === $type && empty( $steps ) ) {
+			$steps = array(
+				array( 'offset_hours' => 0, 'label' => __( 'Passo 1 (Boas-vindas)', 'wpagent' ) ),
+				array( 'offset_hours' => 24, 'label' => __( 'Passo 2 (Acompanhamento)', 'wpagent' ) ),
+				array( 'offset_hours' => 72, 'label' => __( 'Passo 3 (Conteúdo Drip)', 'wpagent' ) ),
+			);
+		}
+
 		$to_email = sanitize_email( $data['to_email'] ?? '' );
 		if ( ! is_email( $to_email ) ) {
 			return new WP_Error( 'wpagent_schedule_invalid_recipient', __( 'Informe um e-mail valido para o agendamento.', 'wpagent' ), array( 'status' => 400 ) );
@@ -128,7 +228,7 @@ class WPAgent_Email_Schedules {
 
 		$content_prompt = sanitize_textarea_field( $data['content_prompt'] ?? '' );
 		if ( '' === trim( $content_prompt ) ) {
-			return new WP_Error( 'wpagent_schedule_missing_prompt', __( 'O agendamento precisa de instrucoes de conteudo (content_prompt).', 'wpagent' ), array( 'status' => 400 ) );
+			$content_prompt = sprintf( __( 'Redija um e-mail atencioso de acompanhamento sobre %s.', 'wpagent' ), ! empty( $data['name'] ) ? $data['name'] : $agent['name'] );
 		}
 
 		if ( 'sequence' === $type && empty( $steps ) ) {
@@ -215,8 +315,11 @@ class WPAgent_Email_Schedules {
 				'session_id'       => sanitize_text_field( $context['session_id'] ?? '' ),
 				'interaction_id'   => absint( $context['interaction_id'] ?? 0 ),
 				'consent_note'     => $prepared['consent_note'],
+				'consent_status'   => 'subscribed',
+				'consented_at'     => current_time( 'mysql' ),
 				'current_step'     => 'sequence' === $prepared['schedule_type'] ? 0 : 0,
 				'next_send_at'     => $next_send_at,
+				'status'           => 'active',
 				'metadata'         => array( 'origin' => 'chat' ),
 			)
 		);
@@ -224,6 +327,15 @@ class WPAgent_Email_Schedules {
 		if ( ! $subscription_id ) {
 			return new WP_Error( 'wpagent_subscription_not_created', __( 'Nao foi possivel registrar a inscricao.', 'wpagent' ), array( 'status' => 500 ) );
 		}
+
+		$this->maybe_schedule_cron();
+		$target_time = strtotime( $next_send_at );
+		if ( $target_time <= ( time() + 60 ) ) {
+			wp_schedule_single_event( time() + 5, self::CRON_HOOK );
+		} else {
+			wp_schedule_single_event( $target_time, self::CRON_HOOK );
+		}
+		$this->spawn_cron();
 
 		return array(
 			'confirmed'      => true,
@@ -237,6 +349,21 @@ class WPAgent_Email_Schedules {
 		);
 	}
 
+	private function spawn_cron() {
+		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			return;
+		}
+
+		wp_remote_post(
+			site_url( 'wp-cron.php?doing_wp_cron=' . rawurlencode( microtime( true ) ) ),
+			array(
+				'timeout'   => 0.01,
+				'blocking'  => false,
+				'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
+			)
+		);
+	}
+
 	private function compute_first_send_at( $proposal ) {
 		if ( 'sequence' === $proposal['schedule_type'] && ! empty( $proposal['sequence_steps'] ) ) {
 			$offset = absint( $proposal['sequence_steps'][0]['offset_hours'] ) * HOUR_IN_SECONDS;
@@ -244,7 +371,7 @@ class WPAgent_Email_Schedules {
 			$offset = $this->frequency_seconds( $proposal['frequency'] );
 		}
 
-		return gmdate( 'Y-m-d H:i:s', time() + $offset );
+		return wp_date( 'Y-m-d H:i:s', time() + $offset );
 	}
 
 	public function frequency_seconds( $frequency ) {
@@ -359,6 +486,7 @@ class WPAgent_Email_Schedules {
 		}
 
 		wp_schedule_single_event( time() + 5, 'wpagent_send_queued_email', array( $event_id ) );
+		do_action( 'wpagent_send_queued_email', $event_id );
 
 		$this->advance_subscription( $subscription_id, $subscription, $schedule );
 	}
@@ -382,7 +510,7 @@ class WPAgent_Email_Schedules {
 	private function advance_subscription( $subscription_id, $subscription, $schedule ) {
 		$type = $schedule['schedule_type'];
 		$occurrences = absint( $subscription['occurrences_sent'] ) + 1;
-		$now = current_time( 'mysql', true );
+		$now = wp_date( 'Y-m-d H:i:s' );
 
 		if ( 'sequence' === $type ) {
 			$steps = is_array( $schedule['sequence_steps'] ) ? $schedule['sequence_steps'] : array();
@@ -401,8 +529,15 @@ class WPAgent_Email_Schedules {
 				return;
 			}
 
-			$next_offset = absint( $steps[ $next_step ]['offset_hours'] ) * HOUR_IN_SECONDS;
-			$next_send_at = gmdate( 'Y-m-d H:i:s', time() + $next_offset );
+			$consented_time = ! empty( $subscription['consented_at'] ) ? strtotime( $subscription['consented_at'] ) : time();
+			$step_offset = absint( $steps[ $next_step ]['offset_hours'] ?? 0 ) * HOUR_IN_SECONDS;
+			$target_time = $consented_time + $step_offset;
+
+			if ( $target_time <= time() ) {
+				$target_time = time() + 60;
+			}
+
+			$next_send_at = wp_date( 'Y-m-d H:i:s', $target_time );
 
 			$this->repository->update_email_subscription(
 				$subscription_id,
@@ -413,10 +548,14 @@ class WPAgent_Email_Schedules {
 					'next_send_at'     => $next_send_at,
 				)
 			);
+
+			wp_schedule_single_event( $target_time, self::CRON_HOOK );
+			$this->spawn_cron();
 			return;
 		}
 
-		$next_send_at = gmdate( 'Y-m-d H:i:s', time() + $this->frequency_seconds( $schedule['frequency'] ) );
+		$next_target = time() + $this->frequency_seconds( $schedule['frequency'] );
+		$next_send_at = wp_date( 'Y-m-d H:i:s', $next_target );
 		$update = array(
 			'occurrences_sent' => $occurrences,
 			'last_sent_at'     => $now,
@@ -427,6 +566,9 @@ class WPAgent_Email_Schedules {
 		if ( $max_occ > 0 && $occurrences >= $max_occ ) {
 			$update['next_send_at'] = null;
 			$update['status'] = 'completed';
+		} else {
+			wp_schedule_single_event( $next_target, self::CRON_HOOK );
+			$this->spawn_cron();
 		}
 
 		$this->repository->update_email_subscription( $subscription_id, $update );
@@ -625,6 +767,8 @@ class WPAgent_Email_Schedules {
 	}
 
 	public function add_admin_menu() {
+		// Menu Agendamentos desativado temporariamente para a v0.5.9
+		/*
 		add_submenu_page(
 			'wpagent',
 			__( 'Agendamentos', 'wpagent' ),
@@ -633,6 +777,7 @@ class WPAgent_Email_Schedules {
 			'wpagent-email-schedules',
 			array( $this, 'render_admin_page' )
 		);
+		*/
 	}
 
 	public function admin_url( $args = array() ) {
@@ -650,23 +795,49 @@ class WPAgent_Email_Schedules {
 		$subscribers  = absint( wp_unslash( $_GET['subscribers'] ?? 0 ) );
 		$agents       = $this->agents->get_agent_options();
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'Agendamentos de e-mail', 'wpagent' ) . '</h1>';
+		WPAgent_Admin_UI::render_header(
+			__( 'Agendamentos e Drip Mailer', 'wpagent' ),
+			__( 'Crie campanhas automáticas de e-mails, captação de leads e sequências ilimitadas no WPAgents.', 'wpagent' )
+		);
+
+		if ( isset( $_GET['message'] ) ) {
+			$message_key = sanitize_key( wp_unslash( $_GET['message'] ) );
+			$messages    = array(
+				'schedule_created'     => __( 'Agendamento criado com sucesso.', 'wpagent' ),
+				'schedule_updated'     => __( 'Agendamento atualizado com sucesso.', 'wpagent' ),
+				'schedule_paused'      => __( 'Agendamento pausado.', 'wpagent' ),
+				'schedule_resumed'     => __( 'Agendamento retomado.', 'wpagent' ),
+				'schedule_archived'    => __( 'Agendamento arquivado.', 'wpagent' ),
+				'schedule_deleted'     => __( 'Agendamento excluido com sucesso.', 'wpagent' ),
+				'subscription_updated' => __( 'Inscricao atualizada.', 'wpagent' ),
+				'schedule_executed'    => __( 'Envios processados e verificados com sucesso.', 'wpagent' ),
+			);
+
+			if ( isset( $messages[ $message_key ] ) ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message_key ] ) . '</p></div>';
+			}
+		}
 
 		if ( 'new' === $action || $edit_id ) {
 			$this->render_schedule_form( $edit_id, $agents );
-			echo '</div>';
+			WPAgent_Admin_UI::render_footer();
 			return;
 		}
 
 		if ( $subscribers ) {
 			$this->render_subscribers_page( $subscribers );
-			echo '</div>';
+			WPAgent_Admin_UI::render_footer();
 			return;
 		}
 
-		echo '<p><a class="button button-primary" href="' . esc_url( $this->admin_url( array( 'view' => 'new' ) ) ) . '">' . esc_html__( 'Criar agendamento', 'wpagent' ) . '</a></p>';
+		$run_now_url = wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_schedule_action&do=run_now&id=0' ), 'wpagent_schedule_run_now' );
+		echo '<p style="display:flex; gap:10px;">';
+		echo '<a class="button button-primary" href="' . esc_url( $this->admin_url( array( 'view' => 'new' ) ) ) . '">' . esc_html__( '+ Novo Agendamento Drip', 'wpagent' ) . '</a>';
+		echo '<a class="button" href="' . esc_url( $run_now_url ) . '">' . esc_html__( '⚡ Processar Envios Pendentes Agora', 'wpagent' ) . '</a>';
+		echo '</p>';
+
 		$this->render_schedules_table( $agents );
-		echo '</div>';
+		WPAgent_Admin_UI::render_footer();
 	}
 
 	private function render_schedules_table( $agents ) {
@@ -680,8 +851,7 @@ class WPAgent_Email_Schedules {
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'Nome', 'wpagent' ) . '</th>';
 		echo '<th>' . esc_html__( 'Agente', 'wpagent' ) . '</th>';
-		echo '<th>' . esc_html__( 'Tipo', 'wpagent' ) . '</th>';
-		echo '<th>' . esc_html__( 'Cadencia', 'wpagent' ) . '</th>';
+		echo '<th>' . esc_html__( 'Cadencia (Passos do Drip)', 'wpagent' ) . '</th>';
 		echo '<th>' . esc_html__( 'Inscritos', 'wpagent' ) . '</th>';
 		echo '<th>' . esc_html__( 'Status', 'wpagent' ) . '</th>';
 		echo '<th>' . esc_html__( 'Acoes', 'wpagent' ) . '</th>';
@@ -689,17 +859,16 @@ class WPAgent_Email_Schedules {
 
 		foreach ( $schedules as $schedule ) {
 			$id = absint( $schedule['id'] );
-			$subscribed = $this->repository->count_email_subscriptions( $id, 'subscribed' );
+			$subscribed = $this->repository->count_email_subscriptions( $id, 'all' );
 			$status = sanitize_key( $schedule['status'] );
 			$status_label = $this->status_label( $status );
 
 			echo '<tr>';
 			echo '<td><strong>' . esc_html( $schedule['name'] ?: '—' ) . '</strong><br><span class="description">' . esc_html( $schedule['origin'] ) . '</span></td>';
 			echo '<td>' . esc_html( $agents[ $schedule['agent_slug'] ] ?? $schedule['agent_slug'] ) . '</td>';
-			echo '<td>' . esc_html( $this->type_label( $schedule['schedule_type'] ) ) . '</td>';
 			echo '<td>' . wp_kses_post( $this->cadence_summary( $schedule ) ) . '</td>';
 			echo '<td><a href="' . esc_url( $this->admin_url( array( 'subscribers' => $id ) ) ) . '">' . absint( $subscribed ) . '</a></td>';
-			echo '<td>' . esc_html( $status_label ) . '</td>';
+			echo '<td><span class="wpagents-status-badge wpagents-status-' . esc_attr( $status ) . '">' . esc_html( $status_label ) . '</span></td>';
 			echo '<td>' . $this->action_links( $id, $status ) . '</td>';
 			echo '</tr>';
 		}
@@ -712,6 +881,7 @@ class WPAgent_Email_Schedules {
 		$links[] = '<a href="' . esc_url( $this->admin_url( array( 'edit' => $id ) ) ) . '">' . esc_html__( 'Editar', 'wpagent' ) . '</a>';
 
 		if ( 'active' === $status ) {
+			$links[] = $this->action_post_link( 'run_now', $id, __( 'Executar Agora', 'wpagent' ) );
 			$links[] = $this->action_post_link( 'pause', $id, __( 'Pausar', 'wpagent' ) );
 		} elseif ( 'paused' === $status ) {
 			$links[] = $this->action_post_link( 'resume', $id, __( 'Retomar', 'wpagent' ) );
@@ -761,23 +931,23 @@ class WPAgent_Email_Schedules {
 		}
 		echo '</select></td></tr>';
 
-		echo '<tr><th scope="row">' . esc_html__( 'Tipo', 'wpagent' ) . '</th>';
-		echo '<td><label><input type="radio" name="schedule_type" value="recurring" ' . checked( $schedule_type, 'recurring', false ) . '> ' . esc_html__( 'Recorrente', 'wpagent' ) . '</label><br>';
-		echo '<label><input type="radio" name="schedule_type" value="sequence" ' . checked( $schedule_type, 'sequence', false ) . '> ' . esc_html__( 'Sequencia (drip)', 'wpagent' ) . '</label></td></tr>';
-
-		echo '<tr><th scope="row"><label for="wpagent-sched-frequency">' . esc_html__( 'Frequencia', 'wpagent' ) . '</label></th>';
-		echo '<td><select id="wpagent-sched-frequency" name="schedule_frequency">';
-		foreach ( array( 'daily' => __( 'Diario', 'wpagent' ), 'weekly' => __( 'Semanal', 'wpagent' ), 'monthly' => __( 'Mensal', 'wpagent' ) ) as $value => $label ) {
-			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $frequency, $value, false ) . '>' . esc_html( $label ) . '</option>';
-		}
-		echo '</select><p class="description">' . esc_html__( 'Usado apenas para agendamentos recorrentes.', 'wpagent' ) . '</p></td></tr>';
+		echo '<tr><th scope="row">' . esc_html__( 'Tipo de Agendamento', 'wpagent' ) . '</th>';
+		echo '<td><input type="hidden" name="schedule_type" value="sequence"><input type="hidden" name="schedule_frequency" value="weekly">';
+		echo '<strong>' . esc_html__( 'Sequência Drip (Envio progressivo por passos)', 'wpagent' ) . '</strong>';
+		echo '<p class="description">' . esc_html__( 'O agente oferecerá esta sequência no chat e o WordPress enviará cada passo automaticamente nos horários definidos abaixo.', 'wpagent' ) . '</p></td></tr>';
 
 		echo '<tr><th scope="row"><label for="wpagent-sched-steps">' . esc_html__( 'Passos da sequencia', 'wpagent' ) . '</label></th>';
 		$steps_text = '';
+		if ( is_string( $steps ) ) {
+			$decoded = json_decode( $steps, true );
+			$steps   = is_array( $decoded ) ? $decoded : array();
+		}
 		if ( is_array( $steps ) ) {
 			$lines = array();
 			foreach ( $steps as $step ) {
-				$lines[] = ( $step['offset_hours'] ?? 0 ) . ' | ' . ( $step['label'] ?? '' );
+				if ( is_array( $step ) ) {
+					$lines[] = ( $step['offset_hours'] ?? 0 ) . ' | ' . ( $step['label'] ?? '' );
+				}
 			}
 			$steps_text = implode( "\n", $lines );
 		}
@@ -807,44 +977,75 @@ class WPAgent_Email_Schedules {
 			return;
 		}
 
+		$total_all       = $this->repository->count_email_subscriptions( $schedule_id, 'all' );
+		$total_active    = $this->repository->count_email_subscriptions( $schedule_id, 'active' );
+		$total_completed = $this->repository->count_email_subscriptions( $schedule_id, 'completed' );
+		$total_unsub     = $this->repository->count_email_subscriptions( $schedule_id, 'unsubscribed' );
+
 		$filter_status = sanitize_key( wp_unslash( $_GET['filter'] ?? '' ) );
-		$args = $filter_status ? array( 'status' => $filter_status ) : array();
+		$args = $filter_status ? array( 'filter' => $filter_status ) : array();
 		$subs = $this->repository->list_email_subscriptions( $schedule_id, array_merge( $args, array( 'limit' => 500 ) ) );
 
-		echo '<h2>' . esc_html( $schedule['name'] ) . ' — ' . esc_html__( 'Inscritos', 'wpagent' ) . '</h2>';
-		echo '<p>';
-		echo '<a class="button" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id ) ) ) . '">' . esc_html__( 'Todos', 'wpagent' ) . '</a> ';
-		echo '<a class="button" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id, 'filter' => 'subscribed' ) ) ) . '">' . esc_html__( 'Ativos', 'wpagent' ) . '</a> ';
-		echo '<a class="button" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id, 'filter' => 'unsubscribed' ) ) ) . '">' . esc_html__( 'Descadastrados', 'wpagent' ) . '</a> ';
-		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_export_subscribers&id=' . $schedule_id ), 'wpagent_export_subscribers' ) ) . '">' . esc_html__( 'Exportar CSV', 'wpagent' ) . '</a>';
+		$steps = is_array( $schedule['sequence_steps'] ) ? $schedule['sequence_steps'] : json_decode( $schedule['sequence_steps'] ?? '', true );
+		$total_steps = is_array( $steps ) && count( $steps ) > 0 ? count( $steps ) : 1;
+
+		echo '<h2>' . esc_html( $schedule['name'] ) . ' — ' . esc_html__( 'Inscritos na Sequência Drip', 'wpagent' ) . '</h2>';
+
+		echo '<div style="display:flex;gap:16px;margin:16px 0 24px;flex-wrap:wrap;">';
+		echo '<div style="background:#fff;border:1px solid #ccd0d4;padding:14px 20px;border-radius:6px;min-width:150px;box-shadow:0 1px 2px rgba(0,0,0,.05);"><strong>' . esc_html__( '👥 Total Cadastrados', 'wpagent' ) . '</strong><div style="font-size:26px;font-weight:bold;margin-top:4px;">' . absint( $total_all ) . '</div></div>';
+		echo '<div style="background:#fff;border:1px solid #ccd0d4;border-left:4px solid #2271b1;padding:14px 20px;border-radius:6px;min-width:150px;box-shadow:0 1px 2px rgba(0,0,0,.05);"><strong>' . esc_html__( '⏳ Em Progresso', 'wpagent' ) . '</strong><div style="font-size:26px;font-weight:bold;margin-top:4px;color:#2271b1;">' . absint( $total_active ) . '</div></div>';
+		echo '<div style="background:#fff;border:1px solid #ccd0d4;border-left:4px solid #00a32a;padding:14px 20px;border-radius:6px;min-width:150px;box-shadow:0 1px 2px rgba(0,0,0,.05);"><strong>' . esc_html__( '✅ Receberam (Concluído)', 'wpagent' ) . '</strong><div style="font-size:26px;font-weight:bold;margin-top:4px;color:#00a32a;">' . absint( $total_completed ) . '</div></div>';
+		echo '<div style="background:#fff;border:1px solid #ccd0d4;border-left:4px solid #d63638;padding:14px 20px;border-radius:6px;min-width:150px;box-shadow:0 1px 2px rgba(0,0,0,.05);"><strong>' . esc_html__( '🛑 Descadastrados', 'wpagent' ) . '</strong><div style="font-size:26px;font-weight:bold;margin-top:4px;color:#d63638;">' . absint( $total_unsub ) . '</div></div>';
+		echo '</div>';
+
+		echo '<p style="margin-bottom:16px;">';
+		echo '<a class="button ' . ( '' === $filter_status ? 'button-primary' : '' ) . '" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id ) ) ) . '">' . esc_html__( 'Todos', 'wpagent' ) . ' (' . absint( $total_all ) . ')</a> ';
+		echo '<a class="button ' . ( 'active' === $filter_status ? 'button-primary' : '' ) . '" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id, 'filter' => 'active' ) ) ) . '">' . esc_html__( 'Em Progresso', 'wpagent' ) . ' (' . absint( $total_active ) . ')</a> ';
+		echo '<a class="button ' . ( 'completed' === $filter_status ? 'button-primary' : '' ) . '" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id, 'filter' => 'completed' ) ) ) . '">' . esc_html__( 'Receberam Tudo', 'wpagent' ) . ' (' . absint( $total_completed ) . ')</a> ';
+		echo '<a class="button ' . ( 'unsubscribed' === $filter_status ? 'button-primary' : '' ) . '" href="' . esc_url( $this->admin_url( array( 'subscribers' => $schedule_id, 'filter' => 'unsubscribed' ) ) ) . '">' . esc_html__( 'Descadastrados', 'wpagent' ) . ' (' . absint( $total_unsub ) . ')</a> ';
+		echo '<a class="button button-secondary" style="margin-left:12px;" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_export_subscribers&id=' . $schedule_id ), 'wpagent_export_subscribers' ) ) . '">📥 ' . esc_html__( 'Exportar CSV', 'wpagent' ) . '</a>';
 		echo '</p>';
 
 		if ( empty( $subs ) ) {
-			echo '<p>' . esc_html__( 'Nenhum inscrito ainda.', 'wpagent' ) . '</p>';
+			echo '<p>' . esc_html__( 'Nenhum inscrito para o filtro selecionado.', 'wpagent' ) . '</p>';
+			echo '<p><a class="button" href="' . esc_url( $this->admin_url() ) . '">' . esc_html__( 'Voltar', 'wpagent' ) . '</a></p>';
 			return;
 		}
 
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'E-mail', 'wpagent' ) . '</th>';
 		echo '<th>' . esc_html__( 'Nome', 'wpagent' ) . '</th>';
-		echo '<th>' . esc_html__( 'Status', 'wpagent' ) . '</th>';
-		echo '<th>' . esc_html__( 'Enviados', 'wpagent' ) . '</th>';
-		echo '<th>' . esc_html__( 'Ultimo envio', 'wpagent' ) . '</th>';
-		echo '<th>' . esc_html__( 'Proximo envio', 'wpagent' ) . '</th>';
+		echo '<th>' . esc_html__( 'Status do Drip', 'wpagent' ) . '</th>';
+		echo '<th>' . esc_html__( 'Progresso', 'wpagent' ) . '</th>';
+		echo '<th>' . esc_html__( 'Ultimo Envio', 'wpagent' ) . '</th>';
+		echo '<th>' . esc_html__( 'Proximo Envio', 'wpagent' ) . '</th>';
+		echo '<th>' . esc_html__( 'Data Inscrição', 'wpagent' ) . '</th>';
 		echo '<th>' . esc_html__( 'Acao', 'wpagent' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
 		foreach ( $subs as $sub ) {
-			$status = sanitize_key( $sub['consent_status'] );
+			$consent = sanitize_key( $sub['consent_status'] );
+			$drip_status = sanitize_key( $sub['status'] );
+			$sent = absint( $sub['occurrences_sent'] );
+
+			if ( 'unsubscribed' === $consent ) {
+				$badge = '<span style="background:#d63638;color:#fff;padding:3px 8px;border-radius:4px;font-weight:600;font-size:11px;">' . esc_html__( 'Descadastrado', 'wpagent' ) . '</span>';
+			} elseif ( 'completed' === $drip_status || $sent >= $total_steps ) {
+				$badge = '<span style="background:#00a32a;color:#fff;padding:3px 8px;border-radius:4px;font-weight:600;font-size:11px;">' . esc_html__( 'Recebeu Tudo (Concluído)', 'wpagent' ) . '</span>';
+			} else {
+				$badge = '<span style="background:#2271b1;color:#fff;padding:3px 8px;border-radius:4px;font-weight:600;font-size:11px;">' . esc_html__( 'Em Progresso', 'wpagent' ) . '</span>';
+			}
+
 			echo '<tr>';
-			echo '<td>' . esc_html( $sub['recipient_email'] ) . '</td>';
-			echo '<td>' . esc_html( $sub['recipient_name'] ) . '</td>';
-			echo '<td>' . esc_html( $this->status_label( $status ) ) . '</td>';
-			echo '<td>' . absint( $sub['occurrences_sent'] ) . '</td>';
-			echo '<td>' . esc_html( $sub['last_sent_at'] ?? '—' ) . '</td>';
-			echo '<td>' . esc_html( $sub['next_send_at'] ?? '—' ) . '</td>';
+			echo '<td><strong>' . esc_html( $sub['recipient_email'] ) . '</strong></td>';
+			echo '<td>' . esc_html( $sub['recipient_name'] ?: '—' ) . '</td>';
+			echo '<td>' . $badge . '</td>';
+			echo '<td>' . sprintf( esc_html__( 'Passo %1$d de %2$d', 'wpagent' ), min( $sent, $total_steps ), $total_steps ) . '</td>';
+			echo '<td>' . esc_html( $sub['last_sent_at'] ?: '—' ) . '</td>';
+			echo '<td>' . esc_html( $sub['next_send_at'] ?: '—' ) . '</td>';
+			echo '<td>' . esc_html( $sub['consented_at'] ?: ( $sub['subscribed_at'] ?: '—' ) ) . '</td>';
 			echo '<td>';
-			if ( 'subscribed' === $status ) {
+			if ( 'subscribed' === $consent ) {
 				$url = wp_nonce_url(
 					admin_url( 'admin-post.php?action=wpagent_schedule_action&do=unsubscribe&id=' . absint( $sub['id'] ) . '&from=' . absint( $schedule_id ) ),
 					'wpagent_schedule_unsubscribe'
@@ -856,16 +1057,16 @@ class WPAgent_Email_Schedules {
 		}
 
 		echo '</tbody></table>';
-		echo '<p><a href="' . esc_url( $this->admin_url() ) . '">' . esc_html__( 'Voltar', 'wpagent' ) . '</a></p>';
+		echo '<p><a class="button" href="' . esc_url( $this->admin_url() ) . '">' . esc_html__( 'Voltar', 'wpagent' ) . '</a></p>';
 	}
 
 	private function cadence_summary( $schedule ) {
 		if ( 'sequence' === $schedule['schedule_type'] ) {
 			$steps = is_array( $schedule['sequence_steps'] ) ? $schedule['sequence_steps'] : array();
 			$labels = array_map( static function ( $step ) {
-				return $step['offset_hours'] . 'h';
+				return '<span class="wpagents-drip-badge">⏳ ' . intval( $step['offset_hours'] ) . 'h</span>';
 			}, $steps );
-			return esc_html__( 'Sequencia', 'wpagent' ) . ': ' . esc_html( implode( ', ', $labels ) );
+			return '<strong>' . esc_html__( 'Drip', 'wpagent' ) . ':</strong> ' . implode( ' ', $labels );
 		}
 
 		$labels = array(
@@ -874,7 +1075,7 @@ class WPAgent_Email_Schedules {
 			'monthly' => __( 'Mensal', 'wpagent' ),
 		);
 
-		return esc_html( $labels[ $schedule['frequency'] ] ?? $schedule['frequency'] );
+		return '<span class="wpagents-drip-badge">📅 ' . esc_html( $labels[ $schedule['frequency'] ] ?? $schedule['frequency'] ) . '</span>';
 	}
 
 	private function type_label( $type ) {
@@ -907,8 +1108,8 @@ class WPAgent_Email_Schedules {
 		$schedule_id = absint( $_POST['schedule_id'] ?? 0 );
 		$name        = sanitize_text_field( wp_unslash( $_POST['schedule_name'] ?? '' ) );
 		$agent_slug  = sanitize_key( wp_unslash( $_POST['schedule_agent'] ?? 'default' ) );
-		$type        = in_array( sanitize_key( wp_unslash( $_POST['schedule_type'] ?? '' ) ), array( 'recurring', 'sequence' ), true ) ? sanitize_key( wp_unslash( $_POST['schedule_type'] ) ) : 'recurring';
-		$frequency   = in_array( sanitize_key( wp_unslash( $_POST['schedule_frequency'] ?? '' ) ), self::RECURRING_FREQUENCIES, true ) ? sanitize_key( wp_unslash( $_POST['schedule_frequency'] ) ) : 'weekly';
+		$type        = 'sequence';
+		$frequency   = 'weekly';
 		$subject     = sanitize_text_field( wp_unslash( $_POST['schedule_subject'] ?? '' ) );
 		$content     = sanitize_textarea_field( wp_unslash( $_POST['schedule_content'] ?? '' ) );
 		$max_occ     = absint( $_POST['schedule_max_occurrences'] ?? 0 );
@@ -930,6 +1131,18 @@ class WPAgent_Email_Schedules {
 			return $a['offset_hours'] <=> $b['offset_hours'];
 		});
 
+		$signature_payload = array(
+			'agent_slug'       => $agent_slug,
+			'name'             => $name,
+			'schedule_type'    => $type,
+			'frequency'        => $frequency,
+			'sequence_steps'   => $steps,
+			'subject_template' => $subject,
+			'content_prompt'   => $content,
+			'max_occurrences'  => $max_occ,
+		);
+		$signature = $this->proposal_signature( $signature_payload );
+
 		$data = array(
 			'agent_slug'       => $agent_slug,
 			'name'             => $name,
@@ -942,24 +1155,28 @@ class WPAgent_Email_Schedules {
 			'status'           => 'active',
 			'origin'           => 'admin',
 			'created_by'       => get_current_user_id(),
-			'signature'        => wp_hash( $agent_slug . '|' . $name . '|' . $type . '|' . time(), 'wpagent_email_action' ),
+			'signature'        => $signature,
 		);
 
 		if ( $schedule_id ) {
 			$this->repository->update_email_schedule( $schedule_id, array(
 				'name'             => $data['name'],
+				'agent_slug'       => $data['agent_slug'],
 				'schedule_type'    => $data['schedule_type'],
 				'frequency'        => $data['frequency'],
 				'sequence_steps'   => $data['sequence_steps'],
 				'subject_template' => $data['subject_template'],
 				'content_prompt'   => $data['content_prompt'],
 				'max_occurrences'  => $data['max_occurrences'],
+				'signature'        => $data['signature'],
 			) );
+			$message_key = 'schedule_updated';
 		} else {
 			$schedule_id = $this->repository->create_email_schedule( $data );
+			$message_key = 'schedule_created';
 		}
 
-		wp_safe_redirect( $this->admin_url() );
+		wp_safe_redirect( $this->admin_url( array( 'message' => $message_key ) ) );
 		exit;
 	}
 
@@ -968,37 +1185,50 @@ class WPAgent_Email_Schedules {
 			wp_die( esc_html__( 'Sem permissao.', 'wpagent' ) );
 		}
 
-		$do   = sanitize_key( wp_unslash( $_GET['do'] ?? '' ) );
-		$id   = absint( wp_unslash( $_GET['id'] ?? 0 ) );
+		$do = sanitize_key( wp_unslash( $_GET['do'] ?? '' ) );
+		$id = absint( wp_unslash( $_GET['id'] ?? 0 ) );
 
 		check_admin_referer( 'wpagent_schedule_' . $do );
 
+		$message_key = '';
 		switch ( $do ) {
+			case 'run_now':
+				$this->process_due();
+				$message_key = 'schedule_executed';
+				break;
 			case 'pause':
 				$this->repository->update_email_schedule( $id, array( 'status' => 'paused' ) );
+				$message_key = 'schedule_paused';
 				break;
 			case 'resume':
 				$this->repository->update_email_schedule( $id, array( 'status' => 'active' ) );
+				$message_key = 'schedule_resumed';
 				break;
 			case 'archive':
 				$this->repository->update_email_schedule( $id, array( 'status' => 'archived' ) );
+				$message_key = 'schedule_archived';
 				break;
 			case 'delete':
 				$this->repository->delete_email_schedule( $id );
+				$message_key = 'schedule_deleted';
 				break;
 			case 'unsubscribe':
 				$this->repository->update_email_subscription( $id, array(
 					'consent_status' => 'unsubscribed',
-					'unsubscribed_at'=> current_time( 'mysql', true ),
+					'unsubscribed_at'=> wp_date( 'Y-m-d H:i:s' ),
 					'next_send_at'   => null,
 					'status'         => 'unsubscribed',
 				) );
+				$message_key = 'subscription_updated';
 				break;
 		}
 
 		$subscribers = absint( wp_unslash( $_GET['from'] ?? 0 ) );
-		$redirect = $subscribers ? $this->admin_url( array( 'subscribers' => $subscribers ) ) : $this->admin_url();
-		wp_safe_redirect( $redirect );
+		$base_args   = $subscribers ? array( 'subscribers' => $subscribers ) : array();
+		if ( $message_key ) {
+			$base_args['message'] = $message_key;
+		}
+		wp_safe_redirect( $this->admin_url( $base_args ) );
 		exit;
 	}
 
@@ -1013,19 +1243,42 @@ class WPAgent_Email_Schedules {
 		$schedule = $this->repository->get_email_schedule( $schedule_id );
 		$subs = $this->repository->list_email_subscriptions( $schedule_id, array( 'limit' => 10000 ) );
 
-		$filename = 'wpagent-subscribers-' . absint( $schedule_id ) . '.csv';
+		$filename = 'wpagent-drip-inscritos-' . absint( $schedule_id ) . '.csv';
+
+		if ( function_exists( 'ob_clean' ) ) {
+			@ob_clean();
+		}
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
 
 		$out = fopen( 'php://output', 'w' );
-		fputcsv( $out, array( 'email', 'name', 'status', 'consented_at', 'occurrences_sent', 'last_sent_at', 'next_send_at' ) );
+		fwrite( $out, "\xEF\xBB\xBF" );
+
+		$steps       = is_array( $schedule['sequence_steps'] ) ? $schedule['sequence_steps'] : json_decode( $schedule['sequence_steps'] ?? '', true );
+		$total_steps = is_array( $steps ) && count( $steps ) > 0 ? count( $steps ) : 1;
+
+		fputcsv( $out, array( 'Email', 'Nome', 'Status do Consentimento', 'Status do Drip', 'Progresso (Passo Atual)', 'Total de Passos', 'Data de Inscricao', 'Ultimo Envio', 'Proximo Envio' ) );
 		foreach ( $subs as $sub ) {
+			$consent = sanitize_key( $sub['consent_status'] );
+			$drip_status = sanitize_key( $sub['status'] );
+			$sent = absint( $sub['occurrences_sent'] );
+
+			if ( 'unsubscribed' === $consent ) {
+				$status_label = 'Descadastrado';
+			} elseif ( 'completed' === $drip_status || $sent >= $total_steps ) {
+				$status_label = 'Concluído';
+			} else {
+				$status_label = 'Em Progresso';
+			}
+
 			fputcsv( $out, array(
 				$sub['recipient_email'],
 				$sub['recipient_name'],
-				$sub['consent_status'],
-				$sub['consented_at'],
-				$sub['occurrences_sent'],
+				$consent,
+				$status_label,
+				min( $sent, $total_steps ),
+				$total_steps,
+				$sub['consented_at'] ?: $sub['subscribed_at'],
 				$sub['last_sent_at'] ?? '',
 				$sub['next_send_at'] ?? '',
 			) );
@@ -1047,5 +1300,5 @@ class WPAgent_Email_Schedules {
 		exit;
 	}
 }
-
 }
+

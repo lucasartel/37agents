@@ -7,93 +7,186 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! class_exists( 'WPAgent_Periodic_Tasks' ) ) {
 class WPAgent_Periodic_Tasks {
 	const CRON_HOOK = 'wpagent_process_periodic_tasks';
-	const STATE_OPTION = 'wpagent_periodic_task_state';
 
+	private $repository;
 	private $settings;
+	private $agents;
+	private $ai_client;
 
-	public function __construct( WPAgent_Settings $settings ) {
-		$this->settings = $settings;
+	public function __construct( WPAgent_Repository $repository, WPAgent_Settings $settings, WPAgent_Agents $agents, ?WPAgent_AI_Client $ai_client = null ) {
+		$this->repository = $repository;
+		$this->settings   = $settings;
+		$this->agents     = $agents;
+		$this->ai_client  = $ai_client;
 	}
 
 	public function register() {
 		add_filter( 'cron_schedules', array( $this, 'cron_schedules' ) );
-		add_action( 'init', array( $this, 'maybe_schedule' ) );
+		add_action( 'init', array( $this, 'maybe_schedule_cron' ) );
+		add_action( 'init', array( $this, 'maybe_process_due_on_request' ), 25 );
 		add_action( self::CRON_HOOK, array( $this, 'process_due_tasks' ) );
-		add_action( 'admin_post_wpagent_run_periodic_task_now', array( $this, 'handle_run_now' ) );
-	}
 
-	public static function task_catalog() {
-		return array(
-			'content_draft' => array(
-				'label'       => __( 'Escrever rascunho de post', 'wpagent' ),
-				'description' => __( 'Gera um rascunho de post para revisao editorial. Nunca publica automaticamente.', 'wpagent' ),
-				'default_prompt' => __( 'Escreva um post curto para o site, com tom claro e util para o publico principal.', 'wpagent' ),
-			),
-			'comment_review' => array(
-				'label'       => __( 'Avaliar comentarios pendentes', 'wpagent' ),
-				'description' => __( 'Analisa comentarios pendentes e gera recomendacoes. Nao aprova, rejeita ou marca spam sozinho.', 'wpagent' ),
-				'default_prompt' => __( 'Avalie os comentarios pendentes e destaque riscos, prioridade de resposta e sugestoes de moderacao.', 'wpagent' ),
-			),
-			'plugin_update_review' => array(
-				'label'       => __( 'Revisar atualizacoes de plugins', 'wpagent' ),
-				'description' => __( 'Lista atualizacoes disponiveis e gera uma recomendacao. Nao atualiza plugins automaticamente.', 'wpagent' ),
-				'default_prompt' => __( 'Analise as atualizacoes de plugins disponiveis e recomende uma ordem segura de revisao.', 'wpagent' ),
-			),
-		);
+		if ( is_admin() ) {
+			add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+			add_action( 'admin_post_wpagent_save_periodic_content', array( $this, 'handle_save_content' ) );
+			add_action( 'admin_post_wpagent_periodic_content_action', array( $this, 'handle_content_action' ) );
+			add_action( 'admin_post_wpagent_run_periodic_content_now', array( $this, 'handle_run_now' ) );
+		}
 	}
 
 	public static function frequency_options() {
 		return array(
-			'hourly' => __( 'A cada hora', 'wpagent' ),
-			'twicedaily' => __( 'Duas vezes por dia', 'wpagent' ),
-			'daily' => __( 'Diariamente', 'wpagent' ),
-			'weekly' => __( 'Semanalmente', 'wpagent' ),
+			'hourly'     => __( 'A cada hora', 'wpagent' ),
+			'twicedaily' => __( 'Duas vezes ao dia', 'wpagent' ),
+			'daily'      => __( 'Diariamente', 'wpagent' ),
+			'weekly'     => __( 'Semanalmente', 'wpagent' ),
 		);
 	}
 
 	public function cron_schedules( $schedules ) {
+		if ( ! isset( $schedules['wpagent_five_minutes'] ) ) {
+			$schedules['wpagent_five_minutes'] = array(
+				'interval' => 300,
+				'display'  => __( 'A cada 5 minutos (WPAgents)', 'wpagent' ),
+			);
+		}
 		if ( ! isset( $schedules['wpagent_weekly'] ) ) {
 			$schedules['wpagent_weekly'] = array(
 				'interval' => WEEK_IN_SECONDS,
-				'display'  => __( 'Weekly', 'wpagent' ),
+				'display'  => __( 'Semanalmente', 'wpagent' ),
 			);
 		}
 
 		return $schedules;
 	}
 
-	public function maybe_schedule() {
-		if ( '1' !== $this->settings->get( 'periodic_tasks_enabled', '0' ) ) {
-			$timestamp = wp_next_scheduled( self::CRON_HOOK );
-			if ( $timestamp ) {
-				wp_unschedule_event( $timestamp, self::CRON_HOOK );
-			}
-			return;
-		}
-
+	public function maybe_schedule_cron() {
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
-			wp_schedule_event( time() + 60, 'hourly', self::CRON_HOOK );
+			wp_schedule_event( time() + 60, 'wpagent_five_minutes', self::CRON_HOOK );
 		}
 	}
 
-	public function process_due_tasks() {
-		if ( '1' !== $this->settings->get( 'periodic_tasks_enabled', '0' ) ) {
+	public function maybe_process_due_on_request() {
+		$last_check = (int) get_transient( 'wpagent_last_periodic_check' );
+		if ( ( time() - $last_check ) < 60 ) {
+			return;
+		}
+		set_transient( 'wpagent_last_periodic_check', time(), 120 );
+
+		$items = $this->repository->list_periodic_contents( array( 'status' => 'active' ) );
+		if ( empty( $items ) ) {
 			return;
 		}
 
-		$options = $this->settings->all();
-		$tasks   = is_array( $options['periodic_tasks'] ?? null ) ? $options['periodic_tasks'] : array();
-
-		foreach ( self::task_catalog() as $task_id => $definition ) {
-			$task = $tasks[ $task_id ] ?? array();
-			if ( '1' !== ( $task['enabled'] ?? '0' ) ) {
-				continue;
-			}
-
-			if ( $this->task_is_due( $task_id, $task['frequency'] ?? 'daily' ) ) {
-				$this->run_task( $task_id );
+		$now = wp_date( 'Y-m-d H:i:s' );
+		$has_due = false;
+		foreach ( $items as $item ) {
+			if ( empty( $item['next_run_at'] ) || $item['next_run_at'] <= $now ) {
+				$has_due = true;
+				break;
 			}
 		}
+
+		if ( $has_due ) {
+			$this->process_due_tasks();
+		}
+	}
+
+	public function add_admin_menu() {
+		add_submenu_page(
+			'wpagent',
+			__( 'Conteudo Periodico', 'wpagent' ),
+			__( 'Conteudo Periodico', 'wpagent' ),
+			'manage_options',
+			'wpagent-periodic-tasks',
+			array( $this, 'render_admin_page' )
+		);
+	}
+
+	public function handle_save_content() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sem permissao.', 'wpagent' ) );
+		}
+
+		check_admin_referer( 'wpagent_save_periodic_content', 'wpagent_nonce' );
+
+		$id = absint( $_POST['id'] ?? 0 );
+		$data = array(
+			'name'          => sanitize_text_field( $_POST['name'] ?? '' ),
+			'agent_slug'    => sanitize_key( $_POST['agent_slug'] ?? 'default' ),
+			'prompt'        => wp_kses_post( $_POST['prompt'] ?? '' ),
+			'frequency'     => sanitize_key( $_POST['frequency'] ?? 'daily' ),
+			'post_category' => absint( $_POST['post_category'] ?? 1 ),
+			'status'        => sanitize_key( $_POST['status'] ?? 'active' ),
+		);
+
+		if ( empty( $data['name'] ) || empty( $data['prompt'] ) ) {
+			$url = add_query_arg(
+				array(
+					'page'  => 'wpagent-periodic-tasks',
+					'error' => 'empty_fields',
+				),
+				admin_url( 'admin.php' )
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		if ( $id > 0 ) {
+			$this->repository->update_periodic_content( $id, $data );
+			$msg = 'updated';
+		} else {
+			$data['next_run_at'] = wp_date( 'Y-m-d H:i:s' );
+			$this->repository->create_periodic_content( $data );
+			$msg = 'created';
+			$this->spawn_cron();
+		}
+
+		$url = add_query_arg(
+			array(
+				'page'    => 'wpagent-periodic-tasks',
+				'success' => $msg,
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	public function handle_content_action() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sem permissao.', 'wpagent' ) );
+		}
+
+		check_admin_referer( 'wpagent_periodic_content_action', 'wpagent_nonce' );
+
+		$id     = absint( $_GET['id'] ?? 0 );
+		$action = sanitize_key( $_GET['do_action'] ?? '' );
+
+		if ( $id <= 0 ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=wpagent-periodic-tasks' ) );
+			exit;
+		}
+
+		if ( 'delete' === $action ) {
+			$this->repository->delete_periodic_content( $id );
+		} elseif ( 'pause' === $action ) {
+			$this->repository->update_periodic_content( $id, array( 'status' => 'paused' ) );
+		} elseif ( 'activate' === $action ) {
+			$next_target = $this->calculate_next_run( 'daily' );
+			$this->repository->update_periodic_content(
+				$id,
+				array(
+					'status'      => 'active',
+					'next_run_at' => wp_date( 'Y-m-d H:i:s', $next_target ),
+				)
+			);
+			wp_schedule_single_event( $next_target, self::CRON_HOOK );
+			$this->spawn_cron();
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'wpagent-periodic-tasks', 'success' => 'action_done' ), admin_url( 'admin.php' ) ) );
+		exit;
 	}
 
 	public function handle_run_now() {
@@ -101,100 +194,96 @@ class WPAgent_Periodic_Tasks {
 			wp_die( esc_html__( 'Sem permissao.', 'wpagent' ) );
 		}
 
-		check_admin_referer( 'wpagent_run_periodic_task_now' );
+		check_admin_referer( 'wpagent_run_periodic_content_now' );
 
-		$task_id = sanitize_key( wp_unslash( $_GET['task'] ?? '' ) );
-		if ( ! isset( self::task_catalog()[ $task_id ] ) ) {
-			wp_die( esc_html__( 'Tarefa invalida.', 'wpagent' ) );
+		$id = absint( $_GET['id'] ?? 0 );
+		$item = $this->repository->get_periodic_content( $id );
+
+		if ( empty( $item ) ) {
+			wp_safe_redirect( add_query_arg( array( 'page' => 'wpagent-periodic-tasks', 'error' => 'not_found' ), admin_url( 'admin.php' ) ) );
+			exit;
 		}
 
-		$this->run_task( $task_id );
-		wp_safe_redirect( admin_url( 'admin.php?page=wpagent&tab=periodic-tasks' ) );
+		$res = $this->execute_content_task( $item );
+
+		if ( is_wp_error( $res ) ) {
+			$url = add_query_arg(
+				array(
+					'page'  => 'wpagent-periodic-tasks',
+					'error' => 'exec_failed',
+					'msg'   => urlencode( $res->get_error_message() ),
+				),
+				admin_url( 'admin.php' )
+			);
+		} else {
+			$url = add_query_arg(
+				array(
+					'page'    => 'wpagent-periodic-tasks',
+					'success' => 'run_ok',
+					'post_id' => absint( $res ),
+				),
+				admin_url( 'admin.php' )
+			);
+		}
+
+		wp_safe_redirect( $url );
 		exit;
 	}
 
-	private function task_is_due( $task_id, $frequency ) {
-		$state = $this->state();
-		$last_run = strtotime( $state[ $task_id ]['last_run'] ?? '' );
+	public function process_due_tasks() {
+		$items = $this->repository->list_periodic_contents( array( 'status' => 'active' ) );
+		$now   = wp_date( 'Y-m-d H:i:s' );
 
-		if ( ! $last_run ) {
-			return true;
+		foreach ( $items as $item ) {
+			if ( empty( $item['next_run_at'] ) || $item['next_run_at'] <= $now ) {
+				$this->execute_content_task( $item );
+			}
 		}
-
-		return ( time() - $last_run ) >= $this->frequency_seconds( $frequency );
 	}
 
-	private function frequency_seconds( $frequency ) {
-		$map = array(
-			'hourly' => HOUR_IN_SECONDS,
-			'twicedaily' => 12 * HOUR_IN_SECONDS,
-			'daily' => DAY_IN_SECONDS,
-			'weekly' => WEEK_IN_SECONDS,
-		);
-
-		return $map[ $frequency ] ?? DAY_IN_SECONDS;
-	}
-
-	private function run_task( $task_id ) {
-		$this->update_task_state( $task_id, array( 'status' => 'running', 'message' => __( 'Executando tarefa.', 'wpagent' ) ) );
-
-		$result = null;
-
-		if ( 'content_draft' === $task_id ) {
-			$result = $this->run_content_draft();
-		} elseif ( 'comment_review' === $task_id ) {
-			$result = $this->run_comment_review();
-		} elseif ( 'plugin_update_review' === $task_id ) {
-			$result = $this->run_plugin_update_review();
+	private function execute_content_task( $item ) {
+		$ai_client = $this->get_ai_client();
+		if ( ! $ai_client ) {
+			return new WP_Error( 'wpagent_no_ai', __( 'Cliente de IA nao disponivel no momento.', 'wpagent' ) );
 		}
 
-		if ( is_wp_error( $result ) ) {
-			$this->update_task_state(
-				$task_id,
-				array(
-					'status'  => 'error',
-					'message' => $result->get_error_message(),
-					'result'  => '',
-				)
-			);
-			return;
-		}
+		$instruction  = trim( $item['prompt'] );
+		$instruction .= "\n\nIMPORTANTE: Crie um post para blog do WordPress. A PRIMEIRA LINHA da sua resposta deve ser EXCLUSIVAMENTE o titulo do post, sem prefixos ou aspas. A partir da segunda linha, forneca todo o conteudo em Markdown bem estruturado. Nao insira comentarios ou agradecimentos adicionais.";
 
-		$this->update_task_state(
-			$task_id,
-			array(
-				'status'  => 'success',
-				'message' => $result['message'] ?? __( 'Tarefa concluida.', 'wpagent' ),
-				'result'  => $result['result'] ?? '',
-				'post_id' => absint( $result['post_id'] ?? 0 ),
-			)
-		);
-	}
-
-	private function run_content_draft() {
-		$prompt = $this->task_prompt( 'content_draft' );
-		$text = $this->generate_text(
-			$prompt,
-			__( 'Voce e um assistente editorial de WordPress. Gere apenas conteudo revisavel, sem publicar nada.', 'wpagent' )
+		$user_id = get_current_user_id() ?: 1;
+		$response = $ai_client->chat(
+			$instruction,
+			$user_id,
+			$item['agent_slug'],
+			'periodic-' . $item['id'],
+			'periodic'
 		);
 
-		if ( is_wp_error( $text ) ) {
-			return $text;
+		if ( is_wp_error( $response ) ) {
+			return $response;
 		}
 
-		if ( 'drafts' !== $this->settings->get( 'periodic_task_mode', 'report_only' ) ) {
-			return array(
-				'message' => __( 'Sugestao de post gerada em modo relatorio.', 'wpagent' ),
-				'result'  => $text,
-			);
+		$reply = is_array( $response ) ? ( $response['reply'] ?? '' ) : (string) $response;
+		$lines = explode( "\n", trim( $reply ) );
+		$title_line = trim( array_shift( $lines ) );
+		$title = ltrim( $title_line, "# \t\"'" );
+		if ( empty( $title ) ) {
+			$title = $item['name'] ?: __( 'Rascunho WPAgent', 'wpagent' );
+		}
+
+		$content = trim( implode( "\n", $lines ) );
+		if ( empty( $content ) ) {
+			$content = $reply;
 		}
 
 		$post_id = wp_insert_post(
 			array(
-				'post_type'    => 'post',
-				'post_status'  => 'draft',
-				'post_title'   => wp_trim_words( wp_strip_all_tags( $text ), 10, '' ) ?: __( 'Rascunho gerado pelo WPAgent', 'wpagent' ),
-				'post_content' => wp_kses_post( $text ),
+				'post_type'     => 'post',
+				'post_status'   => 'draft',
+				'post_title'    => wp_strip_all_tags( $title ),
+				'post_content'  => wp_kses_post( $content ),
+				'post_category' => array( (int) $item['post_category'] ),
+				'post_author'   => $user_id,
 			),
 			true
 		);
@@ -203,227 +292,263 @@ class WPAgent_Periodic_Tasks {
 			return $post_id;
 		}
 
-		return array(
-			'message' => __( 'Rascunho de post criado para revisao.', 'wpagent' ),
-			'result'  => sprintf(
-				/* translators: %d: post id. */
-				__( 'Rascunho criado com ID %d.', 'wpagent' ),
-				absint( $post_id )
-			),
-			'post_id' => absint( $post_id ),
-		);
-	}
+		update_post_meta( $post_id, '_wpagent_generated_by', array(
+			'agent_slug'     => sanitize_key( $item['agent_slug'] ),
+			'generated_at'   => current_time( 'mysql' ),
+			'prompt_preview' => mb_substr( sanitize_textarea_field( $item['prompt'] ), 0, 200 ),
+		) );
 
-	private function run_comment_review() {
-		$comments = get_comments(
+		$next_run_ts = $this->calculate_next_run( $item['frequency'] );
+		$next_run_date = wp_date( 'Y-m-d H:i:s', $next_run_ts );
+
+		$this->repository->update_periodic_content(
+			$item['id'],
 			array(
-				'status' => 'hold',
-				'number' => 20,
-				'orderby' => 'comment_date_gmt',
-				'order' => 'ASC',
+				'last_run_at'  => wp_date( 'Y-m-d H:i:s' ),
+				'next_run_at'  => $next_run_date,
+				'last_post_id' => absint( $post_id ),
 			)
 		);
 
-		if ( empty( $comments ) ) {
-			return array(
-				'message' => __( 'Nenhum comentario pendente para avaliar.', 'wpagent' ),
-				'result'  => '',
-			);
-		}
+		wp_schedule_single_event( $next_run_ts, self::CRON_HOOK );
+		$this->spawn_cron();
 
-		$lines = array();
-		foreach ( $comments as $comment ) {
-			$lines[] = sprintf(
-				"ID %d | Autor: %s | Comentario: %s",
-				absint( $comment->comment_ID ),
-				wp_strip_all_tags( $comment->comment_author ),
-				wp_trim_words( wp_strip_all_tags( $comment->comment_content ), 70 )
-			);
-		}
-
-		$text = $this->generate_text(
-			$this->task_prompt( 'comment_review' ) . "\n\nComentarios pendentes:\n" . implode( "\n", $lines ),
-			__( 'Voce e um assistente de moderacao. Recomende acoes, mas nao diga que executou moderacao.', 'wpagent' )
-		);
-
-		if ( is_wp_error( $text ) ) {
-			return $text;
-		}
-
-		return array(
-			'message' => __( 'Relatorio de comentarios gerado.', 'wpagent' ),
-			'result'  => $text,
-		);
+		return absint( $post_id );
 	}
 
-	private function run_plugin_update_review() {
-		require_once ABSPATH . 'wp-admin/includes/update.php';
-		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-
-		wp_update_plugins();
-		$updates = get_plugin_updates();
-
-		if ( empty( $updates ) ) {
-			return array(
-				'message' => __( 'Nenhuma atualizacao de plugin disponivel.', 'wpagent' ),
-				'result'  => '',
-			);
+	private function spawn_cron() {
+		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			return;
 		}
 
-		$lines = array();
-		foreach ( $updates as $file => $update ) {
-			$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false );
-			$lines[] = sprintf(
-				"%s | Atual: %s | Nova: %s",
-				$plugin_data['Name'] ?? $file,
-				$plugin_data['Version'] ?? '',
-				$update->update->new_version ?? ''
-			);
-		}
-
-		$text = $this->generate_text(
-			$this->task_prompt( 'plugin_update_review' ) . "\n\nAtualizacoes disponiveis:\n" . implode( "\n", $lines ),
-			__( 'Voce e um assistente de manutencao WordPress. Recomende uma ordem segura de revisao, mas nao afirme que atualizou plugins.', 'wpagent' )
-		);
-
-		if ( is_wp_error( $text ) ) {
-			return $text;
-		}
-
-		return array(
-			'message' => __( 'Relatorio de atualizacoes gerado.', 'wpagent' ),
-			'result'  => $text,
-		);
-	}
-
-	private function task_prompt( $task_id ) {
-		$options = $this->settings->all();
-		$tasks = is_array( $options['periodic_tasks'] ?? null ) ? $options['periodic_tasks'] : array();
-		$catalog = self::task_catalog();
-
-		return trim( wp_strip_all_tags( $tasks[ $task_id ]['prompt'] ?? $catalog[ $task_id ]['default_prompt'] ?? '' ) );
-	}
-
-	private function generate_text( $prompt, $system_instruction ) {
-		$builder = null;
-
-		if ( function_exists( 'WordPress\\AI\\get_ai_service' ) ) {
-			$service = call_user_func( 'WordPress\\AI\\get_ai_service' );
-			$builder = $service->create_textgen_prompt(
-				$prompt,
-				array(
-					'system_instruction' => $system_instruction,
-					'temperature'        => 0.3,
-				)
-			);
-		} elseif ( function_exists( 'wp_ai_client_prompt' ) ) {
-			$builder = wp_ai_client_prompt( $prompt )
-				->using_system_instruction( $system_instruction )
-				->using_temperature( 0.3 );
-		}
-
-		if ( $builder ) {
-			$builder = $this->maybe_apply_wordpress_ai_model_preference( $builder );
-			$result = $builder->generate_text();
-
-			return is_wp_error( $result ) ? $result : (string) $result;
-		}
-
-		return $this->generate_text_with_openrouter( $prompt, $system_instruction );
-	}
-
-	private function maybe_apply_wordpress_ai_model_preference( $builder ) {
-		$provider = $this->settings->get( 'wordpress_ai_provider', '' );
-		$model    = $this->settings->get( 'wordpress_ai_model', '' );
-
-		if ( empty( $provider ) || empty( $model ) || ! method_exists( $builder, 'using_model_preference' ) ) {
-			return $builder;
-		}
-
-		return $builder->using_model_preference(
+		wp_remote_post(
+			site_url( 'wp-cron.php?doing_wp_cron=' . rawurlencode( microtime( true ) ) ),
 			array(
-				$provider,
-				$model,
+				'timeout'   => 0.01,
+				'blocking'  => false,
+				'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
 			)
 		);
 	}
 
-	private function generate_text_with_openrouter( $prompt, $system_instruction ) {
-		$api_key = $this->settings->get( 'openrouter_api_key', '' );
-
-		if ( empty( $api_key ) ) {
-			return new WP_Error( 'wpagent_periodic_missing_ai', __( 'Configure um provedor de IA antes de executar tarefas periodicas.', 'wpagent' ) );
+	private function calculate_next_run( $frequency ) {
+		$now = time();
+		switch ( $frequency ) {
+			case 'hourly':
+				return $now + HOUR_IN_SECONDS;
+			case 'twicedaily':
+				return $now + ( 12 * HOUR_IN_SECONDS );
+			case 'weekly':
+				return $now + WEEK_IN_SECONDS;
+			case 'daily':
+			default:
+				return $now + DAY_IN_SECONDS;
 		}
-
-		$response = wp_remote_post(
-			'https://openrouter.ai/api/v1/chat/completions',
-			array(
-				'timeout' => 60,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
-					'Content-Type'  => 'application/json',
-					'HTTP-Referer'  => home_url(),
-					'X-Title'       => get_bloginfo( 'name' ),
-				),
-				'body'    => wp_json_encode(
-					array(
-						'model'       => $this->settings->get( 'openrouter_model', 'openai/gpt-4.1-mini' ),
-						'messages'    => array(
-							array(
-								'role'    => 'system',
-								'content' => $system_instruction,
-							),
-							array(
-								'role'    => 'user',
-								'content' => $prompt,
-							),
-						),
-						'temperature' => 0.3,
-					)
-				),
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$code = wp_remote_retrieve_response_code( $response );
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( $code < 200 || $code >= 300 ) {
-			return new WP_Error( 'wpagent_periodic_ai_error', $body['error']['message'] ?? __( 'Erro ao chamar o provedor de IA.', 'wpagent' ) );
-		}
-
-		$text = $body['choices'][0]['message']['content'] ?? '';
-		if ( '' === trim( (string) $text ) ) {
-			return new WP_Error( 'wpagent_periodic_empty_ai_reply', __( 'O provedor de IA respondeu sem conteudo.', 'wpagent' ) );
-		}
-
-		return $text;
 	}
 
-	private function state() {
-		$state = get_option( self::STATE_OPTION, array() );
-
-		return is_array( $state ) ? $state : array();
+	private function get_ai_client() {
+		if ( $this->ai_client ) {
+			return $this->ai_client;
+		}
+		if ( class_exists( 'WPAgent_AI_Client' ) ) {
+			$this->ai_client = new WPAgent_AI_Client(
+				$this->repository,
+				$this->settings,
+				$this->agents
+			);
+			return $this->ai_client;
+		}
+		return null;
 	}
 
-	private function update_task_state( $task_id, $data ) {
-		$state = $this->state();
-		$state[ $task_id ] = wp_parse_args(
-			$data,
-			array(
-				'last_run' => current_time( 'mysql' ),
-				'status'   => '',
-				'message'  => '',
-				'result'   => '',
-				'post_id'  => 0,
-			)
-		);
-		$state[ $task_id ]['last_run'] = current_time( 'mysql' );
+	public function render_admin_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
 
-		update_option( self::STATE_OPTION, $state, false );
+		$edit_id = absint( $_GET['edit'] ?? 0 );
+		$editing_item = $edit_id > 0 ? $this->repository->get_periodic_content( $edit_id ) : null;
+		$items = $this->repository->list_periodic_contents();
+		$agents_list = $this->agents->get_agent_options();
+		$categories = get_categories( array( 'hide_empty' => false ) );
+		$frequencies = self::frequency_options();
+
+		if ( ! empty( $_GET['success'] ) ) {
+			$succ = sanitize_key( $_GET['success'] );
+			if ( 'run_ok' === $succ ) {
+				$pid = absint( $_GET['post_id'] ?? 0 );
+				$link = get_edit_post_link( $pid );
+				echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
+					/* translators: %s: edit post url */
+					wp_kses_post( __( 'Rascunho de conteúdo gerado com sucesso! <a href="%s" target="_blank">Clique aqui para revisar o Rascunho #%d</a>.', 'wpagent' ) ),
+					esc_url( $link ),
+					$pid
+				) . '</p></div>';
+			} else {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Acao realizada com sucesso.', 'wpagent' ) . '</p></div>';
+			}
+		}
+
+		if ( ! empty( $_GET['error'] ) ) {
+			$err = sanitize_key( $_GET['error'] );
+			if ( 'exec_failed' === $err ) {
+				$msg = urldecode( $_GET['msg'] ?? '' );
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( sprintf( __( 'Erro ao executar tarefa de conteudo: %s', 'wpagent' ), $msg ) ) . '</p></div>';
+			} else {
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Erro ao salvar. Verifique se preencheu todos os campos.', 'wpagent' ) . '</p></div>';
+			}
+		}
+		WPAgent_Admin_UI::render_header(
+			__( 'Conteúdo Periódico do WPAgents', 'wpagent' ),
+			__( 'Crie rotinas automáticas para os agentes gerarem artigos em modo RASCUNHO com aprovação editorial.', 'wpagent' )
+		);
+		?>
+		<div class="wpagents-form-wrap">
+
+			<div id="col-container" class="wp-clearfix">
+				<div id="col-left">
+					<div class="col-wrap">
+						<div class="form-wrap">
+							<h2><?php echo $editing_item ? esc_html__( 'Editar Conteudo Periodico', 'wpagent' ) : esc_html__( 'Novo Conteudo Periodico', 'wpagent' ); ?></h2>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<input type="hidden" name="action" value="wpagent_save_periodic_content">
+								<input type="hidden" name="id" value="<?php echo esc_attr( $editing_item['id'] ?? 0 ); ?>">
+								<?php wp_nonce_field( 'wpagent_save_periodic_content', 'wpagent_nonce' ); ?>
+
+								<div class="form-field form-required">
+									<label for="name"><?php esc_html_e( 'Identificacao do Agendamento', 'wpagent' ); ?></label>
+									<input name="name" id="name" type="text" value="<?php echo esc_attr( $editing_item['name'] ?? '' ); ?>" required aria-required="true">
+									<p><?php esc_html_e( 'Nome interno para identificar esta rotina de postagem.', 'wpagent' ); ?></p>
+								</div>
+
+								<div class="form-field">
+									<label for="agent_slug"><?php esc_html_e( 'Agente Autor', 'wpagent' ); ?></label>
+									<select name="agent_slug" id="agent_slug">
+										<?php foreach ( $agents_list as $slug => $name ) : ?>
+											<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $editing_item['agent_slug'] ?? 'default', $slug ); ?>><?php echo esc_html( $name ); ?></option>
+										<?php endforeach; ?>
+									</select>
+									<p><?php esc_html_e( 'O agente selecionado usara seu proprio conhecimento e personalidade para criar o post.', 'wpagent' ); ?></p>
+								</div>
+
+								<div class="form-field">
+									<label for="post_category"><?php esc_html_e( 'Categoria do Post', 'wpagent' ); ?></label>
+									<select name="post_category" id="post_category">
+										<?php foreach ( $categories as $cat ) : ?>
+											<option value="<?php echo esc_attr( $cat->term_id ); ?>" <?php selected( $editing_item['post_category'] ?? 1, $cat->term_id ); ?>><?php echo esc_html( $cat->name ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</div>
+
+								<div class="form-field">
+									<label for="frequency"><?php esc_html_e( 'Periodicidade', 'wpagent' ); ?></label>
+									<select name="frequency" id="frequency">
+										<?php foreach ( $frequencies as $key => $label ) : ?>
+											<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $editing_item['frequency'] ?? 'daily', $key ); ?>><?php echo esc_html( $label ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</div>
+
+								<div class="form-field form-required">
+									<label for="prompt"><?php esc_html_e( 'Instrucoes de Conteudo', 'wpagent' ); ?></label>
+									<textarea name="prompt" id="prompt" rows="6" required aria-required="true"><?php echo esc_textarea( $editing_item['prompt'] ?? '' ); ?></textarea>
+									<p><?php esc_html_e( 'Ex: Escreva um artigo completo sobre tecnicas de SEO para WordPress com exemplos práticos.', 'wpagent' ); ?></p>
+								</div>
+
+								<div class="form-field">
+									<label for="status"><?php esc_html_e( 'Status', 'wpagent' ); ?></label>
+									<select name="status" id="status">
+										<option value="active" <?php selected( $editing_item['status'] ?? 'active', 'active' ); ?>><?php esc_html_e( 'Ativo', 'wpagent' ); ?></option>
+										<option value="paused" <?php selected( $editing_item['status'] ?? 'active', 'paused' ); ?>><?php esc_html_e( 'Pausado', 'wpagent' ); ?></option>
+									</select>
+								</div>
+
+								<?php submit_button( $editing_item ? __( 'Salvar Alteracoes', 'wpagent' ) : __( 'Adicionar Conteudo Periodico', 'wpagent' ) ); ?>
+								<?php if ( $editing_item ) : ?>
+									<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent-periodic-tasks' ) ); ?>" class="button"><?php esc_html_e( 'Cancelar Edicao', 'wpagent' ); ?></a></p>
+								<?php endif; ?>
+							</form>
+						</div>
+					</div>
+				</div>
+
+				<div id="col-right">
+					<div class="col-wrap">
+						<table class="widefat striped wp-list-table">
+							<thead>
+								<tr>
+									<th><?php esc_html_e( 'Nome / Agente', 'wpagent' ); ?></th>
+									<th><?php esc_html_e( 'Categoria', 'wpagent' ); ?></th>
+									<th><?php esc_html_e( 'Frequencia', 'wpagent' ); ?></th>
+									<th><?php esc_html_e( 'Status', 'wpagent' ); ?></th>
+									<th><?php esc_html_e( 'Ultimo Rascunho Criado', 'wpagent' ); ?></th>
+									<th><?php esc_html_e( 'Acoes', 'wpagent' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php if ( empty( $items ) ) : ?>
+									<tr>
+										<td colspan="6"><?php esc_html_e( 'Nenhum conteudo periodico configurado ainda.', 'wpagent' ); ?></td>
+									</tr>
+								<?php else : ?>
+									<?php foreach ( $items as $row ) : ?>
+										<?php
+										$cat_obj = get_category( absint( $row['post_category'] ) );
+										$cat_name = $cat_obj && ! is_wp_error( $cat_obj ) ? $cat_obj->name : __( 'Sem categoria', 'wpagent' );
+										?>
+										<tr>
+											<td>
+												<strong><?php echo esc_html( $row['name'] ); ?></strong><br>
+												<span class="description"><?php echo esc_html__( 'Agente:', 'wpagent' ) . ' <strong>' . esc_html( $agents_list[ $row['agent_slug'] ] ?? $row['agent_slug'] ) . '</strong>'; ?></span>
+											</td>
+											<td><?php echo esc_html( $cat_name ); ?></td>
+											<td><?php echo esc_html( $frequencies[ $row['frequency'] ] ?? $row['frequency'] ); ?></td>
+											<td>
+												<?php if ( 'active' === $row['status'] ) : ?>
+													<span class="wpagent-badge" style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:12px;"><?php esc_html_e( 'Ativo', 'wpagent' ); ?></span>
+												<?php else : ?>
+													<span class="wpagent-badge" style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:12px;"><?php esc_html_e( 'Pausado', 'wpagent' ); ?></span>
+												<?php endif; ?>
+											</td>
+											<td>
+												<?php if ( ! empty( $row['last_post_id'] ) && $row['last_post_id'] > 0 ) : ?>
+													<a href="<?php echo esc_url( get_edit_post_link( absint( $row['last_post_id'] ) ) ); ?>" class="button button-small" target="_blank">
+														<?php
+														printf(
+															/* translators: %d: post ID */
+															esc_html__( 'Revisar Rascunho #%d', 'wpagent' ),
+															absint( $row['last_post_id'] )
+														);
+														?>
+													</a>
+													<?php if ( ! empty( $row['last_run_at'] ) ) : ?>
+														<br><span class="description" style="font-size:11px;"><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $row['last_run_at'] ) ) ); ?></span>
+													<?php endif; ?>
+												<?php else : ?>
+													<span class="description"><?php esc_html_e( 'Nenhum rascunho gerado', 'wpagent' ); ?></span>
+												<?php endif; ?>
+											</td>
+											<td>
+												<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_run_periodic_content_now&id=' . $row['id'] ), 'wpagent_run_periodic_content_now' ) ); ?>" class="button button-primary button-small"><?php esc_html_e( 'Executar Agora', 'wpagent' ); ?></a>
+												<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent-periodic-tasks&edit=' . $row['id'] ) ); ?>" class="button button-small"><?php esc_html_e( 'Editar', 'wpagent' ); ?></a>
+												<?php if ( 'active' === $row['status'] ) : ?>
+													<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_periodic_content_action&do_action=pause&id=' . $row['id'] ), 'wpagent_periodic_content_action', 'wpagent_nonce' ) ); ?>" class="button button-small"><?php esc_html_e( 'Pausar', 'wpagent' ); ?></a>
+												<?php else : ?>
+													<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_periodic_content_action&do_action=activate&id=' . $row['id'] ), 'wpagent_periodic_content_action', 'wpagent_nonce' ) ); ?>" class="button button-small"><?php esc_html_e( 'Ativar', 'wpagent' ); ?></a>
+												<?php endif; ?>
+												<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_periodic_content_action&do_action=delete&id=' . $row['id'] ), 'wpagent_periodic_content_action', 'wpagent_nonce' ) ); ?>" class="button button-small" onclick="return confirm('<?php esc_attr_e( 'Tem certeza que deseja excluir esta rotina?', 'wpagent' ); ?>');" style="color:#b32d2e;"><?php esc_html_e( 'Excluir', 'wpagent' ); ?></a>
+											</td>
+										</tr>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+		<?php
+		WPAgent_Admin_UI::render_footer();
 	}
 }
 }

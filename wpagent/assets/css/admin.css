@@ -1,0 +1,404 @@
+/**
+ * WPAgents - Official Admin Styling
+ * Modern, crisp, and cohesive design system for all WPAgents admin pages.
+ */
+
+:root {
+	--wpagents-primary: #e24b3f;
+	--wpagents-primary-hover: #c93b30;
+	--wpagents-secondary: #00a8c7;
+	--wpagents-dark: #1e293b;
+	--wpagents-light: #f8fafc;
+	--wpagents-border: #e2e8f0;
+	--wpagents-card-bg: #ffffff;
+	--wpagents-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+	--wpagents-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+	--wpagents-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
+	--wpagents-radius: 12px;
+	--wpagents-radius-sm: 8px;
+}
+
+/* Base Wrapper */
+.wpagents-admin-wrap {
+	max-width: 1280px;
+	margin: 20px 20px 40px 0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	color: #334155;
+}
+
+/* Header Banner */
+.wpagents-admin-header {
+	background: linear-gradient(135deg, #111827 0%, #1e293b 50%, #0f172a 100%);
+	border-radius: var(--wpagents-radius);
+	padding: 24px 32px;
+	margin-bottom: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	box-shadow: var(--wpagents-shadow-md);
+	position: relative;
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wpagents-admin-header::after {
+	content: "";
+	position: absolute;
+	top: -50%;
+	right: -10%;
+	width: 400px;
+	height: 400px;
+	background: radial-gradient(circle, rgba(0, 168, 199, 0.15) 0%, rgba(226, 75, 63, 0) 70%);
+	pointer-events: none;
+}
+
+.wpagents-admin-header-left {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	z-index: 1;
+}
+
+.wpagents-admin-header-logo img {
+	height: 44px;
+	width: auto;
+	display: block;
+	filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+}
+
+.wpagents-admin-header-title {
+	color: #ffffff;
+	font-size: 22px;
+	font-weight: 700;
+	margin: 0;
+	letter-spacing: -0.5px;
+	line-height: 1.2;
+}
+
+.wpagents-admin-header-subtitle {
+	color: #94a3b8;
+	font-size: 13px;
+	margin: 4px 0 0 0;
+	font-weight: 400;
+}
+
+.wpagents-admin-header-right {
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.wpagents-btn-premium {
+	background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+	color: #ffffff !important;
+	text-decoration: none;
+	padding: 10px 18px;
+	border-radius: var(--wpagents-radius-sm);
+	font-size: 13px;
+	font-weight: 600;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+	transition: all 0.2s ease;
+	border: none;
+}
+
+.wpagents-btn-premium:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 6px 16px rgba(217, 119, 6, 0.4);
+	background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.wpagents-badge-version {
+	background: rgba(255, 255, 255, 0.1);
+	color: #e2e8f0;
+	padding: 4px 10px;
+	border-radius: 20px;
+	font-size: 11px;
+	font-weight: 600;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Dashboard Grid */
+.wpagents-dashboard-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 20px;
+	margin-bottom: 32px;
+}
+
+.wpagents-dashboard-card {
+	background: var(--wpagents-card-bg);
+	border: 1px solid var(--wpagents-border);
+	border-radius: var(--wpagents-radius);
+	padding: 24px;
+	transition: all 0.25s ease;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	box-shadow: var(--wpagents-shadow-sm);
+	text-decoration: none;
+	color: inherit;
+	position: relative;
+	overflow: hidden;
+}
+
+.wpagents-dashboard-card:hover {
+	transform: translateY(-3px);
+	box-shadow: var(--wpagents-shadow-lg);
+	border-color: #cbd5e1;
+}
+
+.wpagents-dashboard-card-icon {
+	width: 48px;
+	height: 48px;
+	border-radius: 12px;
+	background: #f1f5f9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 24px;
+	margin-bottom: 16px;
+	transition: transform 0.2s ease;
+}
+
+.wpagents-dashboard-card:hover .wpagents-dashboard-card-icon {
+	transform: scale(1.08);
+}
+
+.wpagents-dashboard-card-title {
+	font-size: 18px;
+	font-weight: 700;
+	color: #0f172a;
+	margin: 0 0 8px 0;
+}
+
+.wpagents-dashboard-card-desc {
+	font-size: 13px;
+	color: #64748b;
+	line-height: 1.5;
+	margin: 0 0 20px 0;
+}
+
+.wpagents-dashboard-card-link {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wpagents-primary);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: auto;
+}
+
+/* Pro Support Banner in Dashboard */
+.wpagents-support-banner {
+	background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%);
+	border-radius: var(--wpagents-radius);
+	padding: 32px;
+	color: #ffffff;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 24px;
+	box-shadow: var(--wpagents-shadow-lg);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	position: relative;
+	overflow: hidden;
+}
+
+.wpagents-support-banner::before {
+	content: "";
+	position: absolute;
+	left: -50px;
+	bottom: -50px;
+	width: 250px;
+	height: 250px;
+	background: radial-gradient(circle, rgba(226, 75, 63, 0.2) 0%, rgba(226, 75, 63, 0) 70%);
+	pointer-events: none;
+}
+
+.wpagents-support-content h3 {
+	font-size: 22px;
+	color: #ffffff;
+	margin: 0 0 10px 0;
+	font-weight: 700;
+}
+
+.wpagents-support-content p {
+	font-size: 14px;
+	color: #cbd5e1;
+	margin: 0;
+	max-width: 650px;
+	line-height: 1.6;
+}
+
+.wpagents-support-actions {
+	display: flex;
+	gap: 12px;
+	flex-shrink: 0;
+	z-index: 1;
+}
+
+.wpagents-btn-light {
+	background: #ffffff;
+	color: #0f172a !important;
+	text-decoration: none;
+	padding: 12px 22px;
+	border-radius: var(--wpagents-radius-sm);
+	font-size: 14px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	transition: all 0.2s ease;
+}
+
+.wpagents-btn-light:hover {
+	background: #f8fafc;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Mailer & Table Modern Styling */
+.wpagents-admin-wrap table.widefat {
+	border: 1px solid var(--wpagents-border);
+	border-radius: var(--wpagents-radius);
+	box-shadow: var(--wpagents-shadow-sm);
+	overflow: hidden;
+	border-collapse: separate;
+	border-spacing: 0;
+	margin-top: 16px;
+}
+
+.wpagents-admin-wrap table.widefat thead th {
+	background: #f8fafc;
+	color: #475569;
+	font-weight: 600;
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	padding: 14px 16px;
+	border-bottom: 2px solid var(--wpagents-border);
+}
+
+.wpagents-admin-wrap table.widefat tbody td {
+	padding: 16px;
+	vertical-align: middle;
+	border-bottom: 1px solid #f1f5f9;
+	font-size: 14px;
+}
+
+.wpagents-admin-wrap table.widefat tbody tr:last-child td {
+	border-bottom: none;
+}
+
+.wpagents-admin-wrap table.widefat tbody tr:hover td {
+	background: #f8fafc;
+}
+
+/* Badges and Tags */
+.wpagents-status-badge {
+	display: inline-block;
+	padding: 4px 10px;
+	border-radius: 20px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
+}
+
+.wpagents-status-active {
+	background: #dcfce7;
+	color: #166534;
+}
+
+.wpagents-status-paused {
+	background: #fef9c3;
+	color: #854d0e;
+}
+
+.wpagents-status-draft {
+	background: #e0e7ff;
+	color: #3730a3;
+}
+
+/* Form Styles */
+.wpagents-form-wrap {
+	background: var(--wpagents-card-bg);
+	border: 1px solid var(--wpagents-border);
+	border-radius: var(--wpagents-radius);
+	padding: 28px;
+	box-shadow: var(--wpagents-shadow-sm);
+	margin-top: 20px;
+}
+
+.wpagents-form-wrap h2 {
+	margin-top: 0;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--wpagents-border);
+	font-size: 18px;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.wpagents-form-row {
+	margin-bottom: 20px;
+}
+
+.wpagents-form-row label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: #334155;
+}
+
+.wpagents-form-row input[type="text"],
+.wpagents-form-row select,
+.wpagents-form-row textarea {
+	width: 100%;
+	max-width: 600px;
+	padding: 10px 12px;
+	border: 1px solid var(--wpagents-border);
+	border-radius: var(--wpagents-radius-sm);
+	font-size: 14px;
+	background: #fff;
+	transition: border-color 0.15s ease;
+}
+
+.wpagents-form-row input:focus,
+.wpagents-form-row select:focus,
+.wpagents-form-row textarea:focus {
+	border-color: var(--wpagents-secondary);
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(0, 168, 199, 0.15);
+}
+
+/* Mailer Drip Cadence Card inside tables */
+.wpagents-drip-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: #f1f5f9;
+	color: #334155;
+	padding: 4px 10px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 500;
+	margin-right: 6px;
+	margin-bottom: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+	.wpagents-admin-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 16px;
+	}
+	.wpagents-support-banner {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}

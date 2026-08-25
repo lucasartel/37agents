@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! class_exists( 'WPAgent_I18n' ) ) {
 class WPAgent_I18n {
 	public static function register() {
-		add_action( 'init', array( __CLASS__, 'load_textdomain' ) );
+		add_action( 'plugins_loaded', array( __CLASS__, 'load_textdomain' ) );
 		add_filter( 'gettext', array( __CLASS__, 'translate' ), 10, 3 );
 	}
 

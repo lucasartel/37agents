@@ -1,17 +1,17 @@
 <?php
 /**
- * Plugin Name: WPAgent
- * Plugin URI: https://github.com/lucasartel/wpagent
+ * Plugin Name: WPAgents
+ * Plugin URI: https://37graus.com.br/wp-agents
  * Description: Personalized AI companion for WordPress 7.0 with local knowledge, user memory, WordPress AI connectors, and OpenRouter fallback.
- * Version: 0.5.7
+ * Version: 0.6.1
  * Requires at least: 7.0
  * Requires PHP: 7.4
  * Tested up to: 7.0.1
- * Author: WPAgent
- * Author URI: https://github.com/lucasartel
+ * Author: WPAgents
+ * Author URI: https://37graus.com.br/wp-agents
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Update URI: https://github.com/lucasartel/wpagent
+ * Update URI: https://37graus.com.br/wp-agents
  * Text Domain: wpagent
  * Domain Path: /languages
  */
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPAGENT_VERSION', '0.5.7' );
+define( 'WPAGENT_VERSION', '0.6.1' );
 define( 'WPAGENT_FILE', __FILE__ );
 define( 'WPAGENT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WPAGENT_URL', plugin_dir_url( __FILE__ ) );
@@ -30,6 +30,12 @@ if ( ! class_exists( 'WPAgent_I18n' ) ) {
 }
 if ( ! class_exists( 'WPAgent_Activator' ) ) {
 	require_once WPAGENT_PATH . 'includes/class-wpagent-activator.php';
+}
+if ( ! class_exists( 'WPAgent_Admin_UI' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-admin-ui.php';
+}
+if ( ! class_exists( 'WPAgent_Dashboard' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-dashboard.php';
 }
 if ( ! class_exists( 'WPAgent_Repository' ) ) {
 	require_once WPAGENT_PATH . 'includes/class-wpagent-repository.php';
@@ -78,6 +84,18 @@ if ( ! class_exists( 'WPAgent_REST_Controller' ) ) {
 }
 if ( ! class_exists( 'WPAgent_Shortcode' ) ) {
 	require_once WPAGENT_PATH . 'includes/class-wpagent-shortcode.php';
+}
+if ( ! class_exists( 'WPAgent_Comment_Suggest' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-comment-suggest.php';
+}
+if ( ! class_exists( 'WPAgent_Bulk_Summary' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-bulk-summary.php';
+}
+if ( ! class_exists( 'WPAgent_Content_Provenance' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-content-provenance.php';
+}
+if ( ! class_exists( 'WPAgent_Comment_Moderation' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-comment-moderation.php';
 }
 if ( ! class_exists( 'WPAgent_Plugin' ) ) {
 	require_once WPAGENT_PATH . 'includes/class-wpagent-plugin.php';

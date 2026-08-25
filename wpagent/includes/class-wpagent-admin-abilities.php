@@ -602,6 +602,77 @@ class WPAgent_Admin_Abilities {
 				'meta'                => array( 'annotations' => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ) ),
 			)
 		);
+
+		wp_register_ability(
+			'wpagent/get-option',
+			array(
+				'label'               => __( 'Consultar opcao do WordPress', 'wpagent' ),
+				'description'         => __( 'Retorna o valor de uma opcao de configuracao do WordPress (como blogname, blogdescription, posts_per_page).', 'wpagent' ),
+				'category'            => 'content-management',
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'option_name' => array(
+							'type'        => 'string',
+							'description' => __( 'Nome da opcao do WordPress a consultar.', 'wpagent' ),
+							'minLength'   => 1,
+						),
+					),
+					'required'             => array( 'option_name' ),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'option_name' => array( 'type' => 'string' ),
+						'value'       => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'get_option' ),
+				'permission_callback' => array( $this, 'can_manage_options' ),
+				'meta'                => array( 'annotations' => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ) ),
+			)
+		);
+
+		wp_register_ability(
+			'wpagent/get-site-health',
+			array(
+				'label'               => __( 'Diagnostico de integridade do site', 'wpagent' ),
+				'description'         => __( 'Retorna dados de saude do WordPress: versao PHP, MySQL, HTTPS, limites de memoria e extensoes.', 'wpagent' ),
+				'category'            => 'content-management',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array( 'type' => 'object' ),
+				'execute_callback'    => array( $this, 'get_site_health' ),
+				'permission_callback' => array( $this, 'can_manage_options' ),
+				'meta'                => array( 'annotations' => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ) ),
+			)
+		);
+
+		wp_register_ability(
+			'wpagent/audit-comments',
+			array(
+				'label'               => __( 'Analisar e moderar comentários', 'wpagent' ),
+				'description'         => __( 'Consulta os comentários pendentes do site, filtra spams e gera relatório com respostas sugeridas por IA.', 'wpagent' ),
+				'category'            => 'content-management',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'total_comments' => array( 'type' => 'integer' ),
+						'summary'        => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'audit_comments' ),
+				'permission_callback' => array( $this, 'can_moderate_comments' ),
+				'meta'                => array( 'annotations' => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ) ),
+			)
+		);
 	}
 
 	public function prompt_context( $limit = 16 ) {
@@ -926,7 +997,30 @@ class WPAgent_Admin_Abilities {
 	}
 
 	public function can_moderate_comments() {
-		return current_user_can( 'moderate_comments' );
+		return current_user_can( 'moderate_comments' ) || current_user_can( 'manage_options' );
+	}
+
+	public function audit_comments( $input = array() ) {
+		$comments = get_comments( array( 'status' => 'hold', 'number' => 10 ) );
+		if ( empty( $comments ) ) {
+			$comments = get_comments( array( 'number' => 5 ) );
+		}
+
+		$summary_text = '';
+		foreach ( $comments as $comment ) {
+			$post_title = get_the_title( $comment->comment_post_ID );
+			$summary_text .= sprintf(
+				"Comentário: %s\nAutor: %s\nPost: %s\nSpam: [A IA deve analisar]\nSugestão: [A IA deve preencher]\n\n",
+				$comment->comment_content,
+				$comment->comment_author,
+				$post_title
+			);
+		}
+
+		return array(
+			'total_comments' => count( $comments ),
+			'summary'        => trim( $summary_text ),
+		);
 	}
 
 	public function can_moderate_comment( $input = array() ) {
@@ -1514,7 +1608,7 @@ class WPAgent_Admin_Abilities {
 		}
 
 		if ( ! $this->settings ) {
-			echo '<div class="wrap"><div class="notice notice-error"><p>' . esc_html__( 'Configuracao nao disponivel.', 'wpagent' ) . '</p></div></div>';
+			echo '<div class="wrap"><div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Configuracao nao disponivel.', 'wpagent' ) . '</p></div></div>';
 			return;
 		}
 
@@ -1531,12 +1625,15 @@ class WPAgent_Admin_Abilities {
 				$active_users++;
 			}
 		}
+		WPAgent_Admin_UI::render_header(
+			__( 'Uso de Tokens do WPAgents', 'wpagent' ),
+			__( 'Acompanhamento do consumo de tokens das APIs por usuário e controle de custos.', 'wpagent' )
+		);
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'WPAgent - Uso de Tokens', 'wpagent' ); ?></h1>
+		<div class="wpagents-form-wrap">
 			<p class="description">
 				<?php esc_html_e( 'Configure o limite na pagina de Configuracoes Gerais.', 'wpagent' ); ?>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent&tab=general' ) ); ?>"><?php esc_html_e( 'Ir para Configuracoes', 'wpagent' ); ?></a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent-settings' ) ); ?>"><?php esc_html_e( 'Ir para Configurações', 'wpagent' ); ?></a>
 			</p>
 			<p>
 				<strong><?php esc_html_e( 'Controle ativo:', 'wpagent' ); ?></strong>
@@ -1606,6 +1703,7 @@ class WPAgent_Admin_Abilities {
 				</form>
 			<?php endif; ?>
 		</div>
+		<?php WPAgent_Admin_UI::render_footer(); ?>
 
 		<script>
 		function wpagent_reset_tokens(userId) {
@@ -1661,6 +1759,64 @@ class WPAgent_Admin_Abilities {
 			<p><?php esc_html_e( 'Nenhum dado de uso de tokens encontrado.', 'wpagent' ); ?></p>
 		<?php endif; ?>
 		<?php
+	}
+
+	public function get_option( $input ) {
+		$option_name = sanitize_key( $input['option_name'] ?? '' );
+		$allowed     = array(
+			'blogname',
+			'blogdescription',
+			'siteurl',
+			'home',
+			'admin_email',
+			'users_can_register',
+			'default_role',
+			'timezone_string',
+			'gmt_offset',
+			'date_format',
+			'time_format',
+			'posts_per_page',
+			'show_on_front',
+			'page_on_front',
+			'page_for_posts',
+			'default_ping_status',
+			'default_comment_status',
+		);
+
+		if ( ! in_array( $option_name, $allowed, true ) && ! current_user_can( 'manage_options' ) ) {
+			return new WP_Error( 'wpagent_forbidden_option', __( 'Opcao nao permitida para consulta.', 'wpagent' ), array( 'status' => 403 ) );
+		}
+
+		$value = get_option( $option_name );
+		if ( false === $value ) {
+			return new WP_Error( 'wpagent_option_not_found', __( 'Opcao nao encontrada.', 'wpagent' ), array( 'status' => 404 ) );
+		}
+
+		return array(
+			'option_name' => $option_name,
+			'value'       => is_scalar( $value ) ? (string) $value : wp_json_encode( $value ),
+		);
+	}
+
+	public function get_site_health( $input = array() ) {
+		global $wpdb;
+		$upload_dir  = wp_upload_dir();
+		$is_writable = wp_is_writable( $upload_dir['basedir'] );
+
+		return array(
+			'wp_version'      => get_bloginfo( 'version' ),
+			'php_version'     => PHP_VERSION,
+			'mysql_version'   => $wpdb->db_version(),
+			'is_ssl'          => is_ssl(),
+			'upload_writable' => $is_writable,
+			'memory_limit'    => WP_MEMORY_LIMIT,
+			'max_execution'   => ini_get( 'max_execution_time' ),
+			'curl_enabled'    => function_exists( 'curl_version' ),
+			'gd_enabled'      => extension_loaded( 'gd' ) || extension_loaded( 'imagick' ),
+			'mbstring'        => extension_loaded( 'mbstring' ),
+			'active_theme'    => wp_get_theme()->get( 'Name' ) . ' (' . wp_get_theme()->get( 'Version' ) . ')',
+			'active_plugins'  => count( (array) get_option( 'active_plugins', array() ) ),
+		);
 	}
 }
 }

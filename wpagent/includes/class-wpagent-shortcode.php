@@ -8,11 +8,13 @@ if ( ! class_exists( 'WPAgent_Shortcode' ) ) {
 class WPAgent_Shortcode {
 	private $settings;
 	private $agents;
+	private $repository;
 	private $inline_script_added = false;
 
-	public function __construct( WPAgent_Settings $settings, WPAgent_Agents $agents ) {
-		$this->settings = $settings;
-		$this->agents   = $agents;
+	public function __construct( WPAgent_Settings $settings, WPAgent_Agents $agents, ?WPAgent_Repository $repository = null ) {
+		$this->settings   = $settings;
+		$this->agents     = $agents;
+		$this->repository = $repository;
 	}
 
 	public function register() {
@@ -91,6 +93,24 @@ class WPAgent_Shortcode {
 		$provider_timeout = max( 15, min( 180, (int) apply_filters( 'wpagent_ai_request_timeout', 90, 'chat' ) ) );
 		$browser_timeout  = max( 30000, min( 240000, (int) apply_filters( 'wpagent_chat_request_timeout', ( $provider_timeout + 15 ) * 1000, $agent ) ) );
 
+		$user_id             = get_current_user_id();
+		$initial_usage_data  = null;
+		$current_usage       = 0;
+		$monthly_limit       = 0;
+		$enable_global_limit = '1' === $this->settings->get( 'enable_global_token_limit', '0' );
+
+		if ( '1' === ( $agent['show_token_usage'] ?? '0' ) && $this->repository ) {
+			$current_monthly    = $this->repository->get_user_monthly_usage( $user_id );
+			$current_usage      = (int) ( $current_monthly['total_tokens'] ?? 0 );
+			$global_limit       = (int) $this->settings->get( 'global_token_limit', 100000 );
+			$monthly_limit      = $enable_global_limit && ! current_user_can( 'manage_options' ) ? $global_limit : 0;
+			$initial_usage_data = array(
+				'current_monthly' => $current_usage,
+				'monthly_limit'   => $monthly_limit,
+				'remaining'       => $monthly_limit > 0 ? max( 0, $monthly_limit - $current_usage ) : null,
+			);
+		}
+
 		ob_start();
 		?>
 		<div
@@ -101,78 +121,99 @@ class WPAgent_Shortcode {
 			data-profile-url="<?php echo esc_url( rest_url( 'wpagent/v1/profile' ) ); ?>"
 			data-abilities-url="<?php echo esc_url( rest_url( 'wpagent/v1/abilities/run' ) ); ?>"
 			data-email-actions-url="<?php echo esc_url( rest_url( 'wpagent/v1/email/send' ) ); ?>"
+			data-email-schedules-url="<?php echo esc_url( rest_url( 'wpagent/v1/email/schedule' ) ); ?>"
+			data-projects-url="<?php echo esc_url( rest_url( 'wpagent/v1/projects' ) ); ?>"
+			data-upload-url="<?php echo esc_url( rest_url( 'wpagent/v1/chat/upload' ) ); ?>"
 			data-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>"
 			data-request-timeout="<?php echo esc_attr( $browser_timeout ); ?>"
 			data-debug-errors="<?php echo current_user_can( 'manage_options' ) ? '1' : '0'; ?>"
 			data-logged-in="<?php echo is_user_logged_in() ? '1' : '0'; ?>"
 			data-user-profile-enabled="<?php echo '1' === ( $agent['user_profile_enabled'] ?? '0' ) ? '1' : '0'; ?>"
+			data-enable-projects="<?php echo '1' === ( $agent['enable_projects'] ?? '0' ) ? '1' : '0'; ?>"
+			data-enable-frontend-uploads="<?php echo '1' === ( $agent['enable_frontend_uploads'] ?? '0' ) ? '1' : '0'; ?>"
 			data-show-token-usage="<?php echo '1' === ( $agent['show_token_usage'] ?? '0' ) ? '1' : '0'; ?>"
 			data-default-theme="<?php echo 'dark' === ( $agent['default_theme'] ?? 'light' ) ? 'dark' : 'light'; ?>"
+			data-initial-token-usage="<?php echo esc_attr( wp_json_encode( $initial_usage_data ) ); ?>"
 			data-i18n="<?php echo esc_attr( wp_json_encode( WPAgent_I18n::chat_strings() ) ); ?>"
 		>
-			<div class="wpagent-chat__mobile-bar">
-				<button type="button" class="wpagent-chat__toggle-conversations" aria-expanded="false"><?php esc_html_e( 'Conversas', 'wpagent' ); ?></button>
-				<span class="wpagent-chat__mobile-title"><?php echo esc_html( $title ); ?></span>
-				<button type="button" class="wpagent-chat__new-conversation wpagent-chat__new-conversation--mobile"><?php esc_html_e( 'Nova', 'wpagent' ); ?></button>
-			</div>
-			<div class="wpagent-chat__sidebar" aria-label="<?php esc_attr_e( 'Conversas', 'wpagent' ); ?>">
-				<div class="wpagent-chat__sidebar-header">
-					<div>
-						<strong><?php echo esc_html( $title ); ?></strong>
-						<span><?php esc_html_e( 'Suas conversas', 'wpagent' ); ?></span>
-					</div>
-					<button type="button" class="wpagent-chat__new-conversation"><?php esc_html_e( 'Nova', 'wpagent' ); ?></button>
+			<?php if ( '1' === ( $agent['enable_projects'] ?? '0' ) ) : ?>
+				<div class="wpagent-chat__projects-bar" data-wpagent-projects-bar>
+					<div class="wpagent-chat__projects-tabs" data-wpagent-projects-tabs></div>
+					<button type="button" class="wpagent-chat__add-project" data-wpagent-add-project title="<?php esc_attr_e( 'Nova aba / projeto', 'wpagent' ); ?>">+ <?php esc_html_e( 'Novo projeto', 'wpagent' ); ?></button>
 				</div>
-				<div class="wpagent-chat__conversations"></div>
-				<?php if ( is_user_logged_in() && '1' === ( $agent['user_profile_enabled'] ?? '0' ) ) : ?>
-					<div class="wpagent-chat__profile" data-wpagent-profile>
-						<label for="wpagent-profile-<?php echo esc_attr( $agent['slug'] ); ?>"><?php echo esc_html( $agent['user_profile_label'] ?: __( 'Sobre voce', 'wpagent' ) ); ?></label>
-						<p><?php echo esc_html( $agent['user_profile_description'] ?: __( 'Compartilhe informacoes que ajudam este agente a personalizar as respostas.', 'wpagent' ) ); ?></p>
-						<?php $this->render_profile_fields( $agent ); ?>
-						<?php if ( ! empty( $agent['user_profile_fields'] ) ) : ?>
-							<label class="wpagent-chat__profile-free-label" for="wpagent-profile-<?php echo esc_attr( $agent['slug'] ); ?>"><?php esc_html_e( 'Observacoes adicionais', 'wpagent' ); ?></label>
-						<?php endif; ?>
-						<textarea id="wpagent-profile-<?php echo esc_attr( $agent['slug'] ); ?>" rows="5" maxlength="4000" data-profile-free placeholder="<?php esc_attr_e( 'Ex.: ano em que leciono, estilo de aula, objetivos e preferencias...', 'wpagent' ); ?>"></textarea>
-						<div class="wpagent-chat__profile-actions">
-							<span class="wpagent-chat__profile-status" aria-live="polite"></span>
-							<button type="button" class="wpagent-chat__profile-save"><?php esc_html_e( 'Salvar perfil', 'wpagent' ); ?></button>
+			<?php endif; ?>
+			<div class="wpagent-chat__body">
+				<div class="wpagent-chat__mobile-bar">
+					<button type="button" class="wpagent-chat__toggle-conversations" aria-expanded="false"><?php esc_html_e( 'Conversas', 'wpagent' ); ?></button>
+					<span class="wpagent-chat__mobile-title"><?php echo esc_html( $title ); ?></span>
+					<button type="button" class="wpagent-chat__new-conversation wpagent-chat__new-conversation--mobile"><?php esc_html_e( 'Nova', 'wpagent' ); ?></button>
+				</div>
+				<div class="wpagent-chat__sidebar" aria-label="<?php esc_attr_e( 'Conversas', 'wpagent' ); ?>">
+					<div class="wpagent-chat__sidebar-header">
+						<div>
+							<strong><?php echo esc_html( $title ); ?></strong>
+							<span><?php esc_html_e( 'Suas conversas', 'wpagent' ); ?></span>
 						</div>
+						<button type="button" class="wpagent-chat__new-conversation"><?php esc_html_e( 'Nova', 'wpagent' ); ?></button>
 					</div>
-				<?php endif; ?>
-			</div>
-			<div class="wpagent-chat__main">
-				<div class="wpagent-chat__header">
-					<button type="button" class="wpagent-chat__toggle-conversations wpagent-chat__toggle-conversations--desktop" aria-expanded="true"><?php esc_html_e( 'Conversas', 'wpagent' ); ?></button>
-					<div class="wpagent-chat__conversation-heading">
-						<strong class="wpagent-chat__conversation-title"><?php esc_html_e( 'Nova conversa', 'wpagent' ); ?></strong>
-						<span class="wpagent-chat__status"><?php esc_html_e( 'Pronto para conversar', 'wpagent' ); ?></span>
-					</div>
-					<button type="button" class="wpagent-chat__theme-toggle" aria-pressed="false"><?php esc_html_e( 'Modo escuro', 'wpagent' ); ?></button>
-					<button type="button" class="wpagent-chat__rename-conversation"><?php esc_html_e( 'Renomear', 'wpagent' ); ?></button>
-				</div>
-				<div class="wpagent-chat__messages" aria-live="polite">
-					<div class="wpagent-chat__empty">
-						<strong><?php esc_html_e( 'Como posso ajudar?', 'wpagent' ); ?></strong>
-						<span><?php esc_html_e( 'Escreva uma pergunta ou escolha uma conversa anterior.', 'wpagent' ); ?></span>
-					</div>
-				</div>
-				<form class="wpagent-chat__form">
-					<label class="screen-reader-text" for="wpagent-message-<?php echo esc_attr( $agent['slug'] ); ?>"><?php esc_html_e( 'Mensagem', 'wpagent' ); ?></label>
-					<div class="wpagent-chat__composer">
-						<textarea id="wpagent-message-<?php echo esc_attr( $agent['slug'] ); ?>" rows="1" placeholder="<?php esc_attr_e( 'Escreva sua mensagem...', 'wpagent' ); ?>"></textarea>
-						<button type="submit"><?php esc_html_e( 'Enviar', 'wpagent' ); ?></button>
-					</div>
-					<div class="wpagent-chat__hint"><?php esc_html_e( 'Enter envia. Shift + Enter quebra linha.', 'wpagent' ); ?></div>
-					<?php if ( '1' === ( $agent['show_token_usage'] ?? '0' ) ) : ?>
-						<div class="wpagent-chat__token-usage" data-wpagent-token-usage>
-							<div class="wpagent-chat__token-summary">
-								<span class="wpagent-chat__token-count"></span>
-								<span class="wpagent-chat__token-limit"></span>
+					<div class="wpagent-chat__conversations"></div>
+					<?php if ( is_user_logged_in() && '1' === ( $agent['user_profile_enabled'] ?? '0' ) ) : ?>
+						<div class="wpagent-chat__profile" data-wpagent-profile>
+							<label for="wpagent-profile-<?php echo esc_attr( $agent['slug'] ); ?>"><?php echo esc_html( $agent['user_profile_label'] ?: __( 'Sobre voce', 'wpagent' ) ); ?></label>
+							<p><?php echo esc_html( $agent['user_profile_description'] ?: __( 'Compartilhe informacoes que ajudam este agente a personalizar as respostas.', 'wpagent' ) ); ?></p>
+							<?php $this->render_profile_fields( $agent ); ?>
+							<?php if ( ! empty( $agent['user_profile_fields'] ) ) : ?>
+								<label class="wpagent-chat__profile-free-label" for="wpagent-profile-<?php echo esc_attr( $agent['slug'] ); ?>"><?php esc_html_e( 'Observacoes adicionais', 'wpagent' ); ?></label>
+							<?php endif; ?>
+							<textarea id="wpagent-profile-<?php echo esc_attr( $agent['slug'] ); ?>" rows="5" maxlength="4000" data-profile-free placeholder="<?php esc_attr_e( 'Ex.: ano em que leciono, estilo de aula, objetivos e preferencias...', 'wpagent' ); ?>"></textarea>
+							<div class="wpagent-chat__profile-actions">
+								<span class="wpagent-chat__profile-status" aria-live="polite"></span>
+								<button type="button" class="wpagent-chat__profile-save"><?php esc_html_e( 'Salvar perfil', 'wpagent' ); ?></button>
 							</div>
-							<div class="wpagent-chat__token-progress" aria-hidden="true"><span></span></div>
 						</div>
 					<?php endif; ?>
-				</form>
+				</div>
+				<div class="wpagent-chat__main">
+					<div class="wpagent-chat__header">
+						<button type="button" class="wpagent-chat__toggle-conversations wpagent-chat__toggle-conversations--desktop" aria-expanded="true"><?php esc_html_e( 'Conversas', 'wpagent' ); ?></button>
+						<div class="wpagent-chat__conversation-heading">
+							<strong class="wpagent-chat__conversation-title"><?php esc_html_e( 'Nova conversa', 'wpagent' ); ?></strong>
+							<span class="wpagent-chat__status"><?php esc_html_e( 'Pronto para conversar', 'wpagent' ); ?></span>
+						</div>
+						<button type="button" class="wpagent-chat__theme-toggle" aria-pressed="false"><?php esc_html_e( 'Modo escuro', 'wpagent' ); ?></button>
+						<button type="button" class="wpagent-chat__rename-conversation"><?php esc_html_e( 'Renomear', 'wpagent' ); ?></button>
+					</div>
+					<div class="wpagent-chat__messages" role="log" aria-live="polite">
+						<div class="wpagent-chat__empty">
+							<strong><?php esc_html_e( 'Como posso ajudar?', 'wpagent' ); ?></strong>
+							<span><?php esc_html_e( 'Escreva uma pergunta ou escolha uma conversa anterior.', 'wpagent' ); ?></span>
+						</div>
+					</div>
+					<form class="wpagent-chat__form">
+						<label class="screen-reader-text" for="wpagent-message-<?php echo esc_attr( $agent['slug'] ); ?>"><?php esc_html_e( 'Mensagem', 'wpagent' ); ?></label>
+						<div class="wpagent-chat__composer">
+							<textarea id="wpagent-message-<?php echo esc_attr( $agent['slug'] ); ?>" rows="1" placeholder="<?php esc_attr_e( 'Escreva sua mensagem...', 'wpagent' ); ?>"></textarea>
+							<button type="submit"><?php esc_html_e( 'Enviar', 'wpagent' ); ?></button>
+						</div>
+						<div class="wpagent-chat__hint"><?php esc_html_e( 'Enter envia. Shift + Enter quebra linha.', 'wpagent' ); ?></div>
+						<?php if ( '1' === ( $agent['show_token_usage'] ?? '0' ) && $this->repository ) : ?>
+							<div class="wpagent-chat__token-usage" data-wpagent-token-usage>
+								<div class="wpagent-chat__token-summary">
+									<span class="wpagent-chat__token-label"><?php esc_html_e( 'Tokens este mês:', 'wpagent' ); ?></span>
+									<span class="wpagent-chat__token-count" data-token-usage-current><?php echo esc_html( number_format_i18n( $current_usage ) ); ?></span>
+									<span class="wpagent-chat__token-separator">/</span>
+									<span class="wpagent-chat__token-limit" data-token-usage-limit><?php echo $monthly_limit > 0 ? esc_html( number_format_i18n( $monthly_limit ) ) : esc_html__( 'Ilimitado', 'wpagent' ); ?></span>
+								</div>
+								<?php if ( $monthly_limit > 0 ) : ?>
+									<?php $pct = min( 100, max( 0, round( ( $current_usage / $monthly_limit ) * 100 ) ) ); ?>
+									<div class="wpagent-chat__token-progress" role="progressbar" aria-valuenow="<?php echo esc_attr( $pct ); ?>" aria-valuemin="0" aria-valuemax="100">
+										<span style="width: <?php echo esc_attr( $pct ); ?>%;"></span>
+									</div>
+								<?php endif; ?>
+							</div>
+						<?php endif; ?>
+					</form>
+				</div>
 			</div>
 		</div>
 		<?php

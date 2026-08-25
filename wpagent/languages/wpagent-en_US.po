@@ -1,0 +1,1919 @@
+# WPAgents English translation.
+msgid ""
+msgstr ""
+"Project-Id-Version: WPAgents 1.0\n"
+"Report-Msgid-Bugs-To: https://37graus.com.br/wp-agents\n"
+"POT-Creation-Date: 2026-07-30 17:28+0000\n"
+"PO-Revision-Date: 2026-07-30 17:28+0000\n"
+"Last-Translator: WPAgents <support@37graus.com.br>\n"
+"Language-Team: WPAgents <support@37graus.com.br>\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid " (pag. %d)"
+msgstr " (page %d)"
+
+msgid " / Ilimitado"
+msgstr " / Unlimited"
+
+msgid "\"?"
+msgstr "\"?"
+
+msgid "%1$d trechos, %2$d caracteres"
+msgstr "%1$d snippets, %2$d characters"
+
+msgid "%1$d/%2$d prontos"
+msgstr "%1$d/%2$d ready"
+
+msgid "%1$s enviados, %2$s falhas, %3$s total"
+msgstr "%1$s sent, %2$s failed, %3$s total"
+
+msgid "%1$s foi recebido, mas nao foi indexado: %2$s"
+msgstr "%1$s was received but not indexed: %2$s"
+
+msgid "%d embeddings processados manualmente."
+msgstr "%d embeddings processed manually."
+
+msgid "%d embeddings processados no ultimo lote."
+msgstr "%d embeddings processed in the last batch."
+
+msgid "%d trechos indexados a partir do texto manual."
+msgstr "%d snippets indexed from manual text."
+
+msgid "%d trechos indexados."
+msgstr "%d snippets indexed."
+
+msgid "%s tokens"
+msgstr "%s tokens"
+
+msgid "%s tokens/mes"
+msgstr "%s tokens/month"
+
+msgid "(formato nao reconhecido)"
+msgstr "(unrecognized format)"
+
+msgid "(sem titulo)"
+msgstr "(no title)"
+
+msgid "+ Novo Agendamento Drip"
+msgstr "+ New Drip Schedule"
+
+msgid "0 = ilimitado (para recorrentes) ou ate o fim da sequencia."
+msgstr "0 = unlimited (for recurring) or until the end of the sequence."
+
+msgid "A Abilities API do WordPress nao esta disponivel."
+msgstr "The WordPress Abilities API is not available."
+
+msgid "A cada hora"
+msgstr "Hourly"
+
+msgid "A conversa precisa ter no mínimo 2 interações para gerar um resumo."
+msgstr "The conversation must have at least 2 interactions to generate a summary."
+
+msgid "A extracao encontrou muitos simbolos e poucas palavras legiveis. Converta o documento para TXT/Markdown ou use um extrator/OCR externo."
+msgstr "Extraction found many symbols and few readable words. Convert the document to TXT/Markdown or use an external extractor/OCR."
+
+msgid "A extracao nao encontrou texto legivel suficiente."
+msgstr "Extraction did not find enough readable text."
+
+msgid "A listagem automatica de modelos depende de cada conector expor essa informacao. Por enquanto, use o ID oficial do modelo informado pelo fornecedor."
+msgstr "Automatic model listing depends on each connector exposing this information. For now, use the official model ID provided by the vendor."
+
+msgid "A proposta de agendamento expirou ou foi alterada."
+msgstr "The schedule proposal has expired or changed."
+
+msgid "A proposta de email expirou ou foi alterada. Peca ao agente para preparar o envio novamente."
+msgstr "The email proposal has expired or changed. Ask the agent to prepare the send again."
+
+msgid "A resposta demorou demais. Verifique a chave, o modelo e o fornecedor de IA."
+msgstr "The response took too long. Check the key, model, and AI provider."
+
+msgid "A resposta excedeu o tempo de espera do navegador. Tente novamente em instantes."
+msgstr "The response exceeded the browser timeout. Try again shortly."
+
+msgid "A sequencia precisa de pelo menos um passo."
+msgstr "The sequence requires at least one step."
+
+msgid "Abas de Projetos / Clientes"
+msgstr "Projects / Clients Tabs"
+
+msgid "Ability nao encontrada."
+msgstr "Ability not found."
+
+msgid "Abrir Mailer Drip →"
+msgstr "Open Mailer Drip →"
+
+msgid "Abrir conversa "
+msgstr "Open conversation "
+
+msgid "Acao"
+msgstr "Action"
+
+msgid "Acao de comentario invalida."
+msgstr "Invalid comment action."
+
+msgid "Acao de moderacao. reject move o comentario para a lixeira."
+msgstr "Moderation action. reject moves the comment to the trash."
+
+msgid "Acao executada"
+msgstr "Action executed"
+
+msgid "Acao proposta"
+msgstr "Proposed action"
+
+msgid "Acao realizada com sucesso."
+msgstr "Action performed successfully."
+
+msgid "Acoes"
+msgstr "Actions"
+
+msgid "Acompanhamento do consumo de tokens das APIs por usuário e controle de custos."
+msgstr "Tracking API token consumption per user and cost control."
+
+msgid "Acompanhe métricas de desempenho, volume de interações, conversões e taxa de engajamento."
+msgstr "Track performance metrics, interaction volume, conversions, and engagement rate."
+
+msgid "Acompanhe o consumo de tokens, desempenho por agente e volume de atendimentos."
+msgstr "Track token consumption, agent performance, and customer service volume."
+
+msgid "Acompanhe os emails coletados com consentimento durante conversas em que o agente preparou e enviou mensagens autorizadas pelo usuario."
+msgstr "Track emails collected with consent during conversations where the agent prepared and sent messages authorized by the user."
+
+msgid "Adicionar Conteudo Periodico"
+msgstr "Add Periodic Content"
+
+msgid "Adicionar agente"
+msgstr "Add agent"
+
+msgid "Agendamento arquivado."
+msgstr "Schedule archived."
+
+msgid "Agendamento atualizado com sucesso."
+msgstr "Schedule updated successfully."
+
+msgid "Agendamento criado com sucesso."
+msgstr "Schedule created successfully."
+
+msgid "Agendamento excluido com sucesso."
+msgstr "Schedule deleted successfully."
+
+msgid "Agendamento nao encontrado."
+msgstr "Schedule not found."
+
+msgid "Agendamento pausado."
+msgstr "Schedule paused."
+
+msgid "Agendamento retomado."
+msgstr "Schedule resumed."
+
+msgid "Agendamentos"
+msgstr "Schedules"
+
+msgid "Agendamentos e Drip Mailer"
+msgstr "Schedules and Drip Mailer"
+
+msgid "Agende seus agentes para redigirem artigos de blog em modo rascunho com revisão editorial."
+msgstr "Schedule your agents to draft blog articles for editorial review."
+
+msgid "Agent"
+msgstr "Agent"
+
+msgid "Agente"
+msgstr "Agent"
+
+msgid "Agente Autor"
+msgstr "Author Agent"
+
+msgid "Agente:"
+msgstr "Agent:"
+
+msgid "Agentes"
+msgstr "Agents"
+
+msgid "Agentes de IA do WPAgents"
+msgstr "WPAgents AI Agents"
+
+msgid "Agents"
+msgstr "Agents"
+
+msgid "Aguardando extrator"
+msgstr "Waiting for extractor"
+
+msgid "Aguardando indice"
+msgstr "Waiting for index"
+
+msgid "Ajustar Conectores →"
+msgstr "Adjust Connectors →"
+
+msgid "Altera somente o titulo de um post ou pagina existente."
+msgstr "Only changes the title of an existing post or page."
+
+msgid "Alterar titulo de post ou pagina"
+msgstr "Change post or page title"
+
+msgid "Ano escolar | ano_escolar | text | Ex.: 3º ano"
+msgstr "School year | school_year | text | Ex.: 3rd year"
+
+msgid "Ao ativar, o widget flutuante de atendimento do WPAgents ficará disponível em todas as páginas públicas do WordPress."
+msgstr "When enabled, the WPAgents floating service widget will be available on all public WordPress pages."
+
+msgid "Apagando conversa..."
+msgstr "Deleting conversation..."
+
+msgid "Apagar a conversa \""
+msgstr "Delete conversation \""
+
+msgid "Apagar conversa "
+msgstr "Delete conversation "
+
+msgid "Aparência padrão do chat"
+msgstr "Default chat appearance"
+
+msgid "Aprova, rejeita, marca como spam ou coloca um comentario na lixeira."
+msgstr "Approves, rejects, marks as spam, or trashes a comment."
+
+msgid "Aprovar ou rejeitar comentario"
+msgstr "Approve or reject comment"
+
+msgid "Arquivado"
+msgstr "Archived"
+
+msgid "Arquivo de treinamento"
+msgstr "Training file"
+
+msgid "Arquivo nao encontrado para indexacao."
+msgstr "File not found for indexing."
+
+msgid "Arquivos de treinamento"
+msgstr "Training files"
+
+msgid "Assistente interno do admin"
+msgstr "Internal admin assistant"
+
+msgid "Assistente público do site"
+msgstr "Public site assistant"
+
+msgid "Assunto"
+msgstr "Subject"
+
+msgid "Atendimentos"
+msgstr "Customer Service"
+
+msgid "Atendimentos do WPAgents"
+msgstr "WPAgents Customer Service"
+
+msgid "Ativar"
+msgstr "Enable"
+
+msgid "Ativar busca semantica por embeddings para documentos indexados."
+msgstr "Enable semantic search by embeddings for indexed documents."
+
+msgid "Ativar controle de uso de tokens por usuário"
+msgstr "Enable token usage control per user"
+
+msgid "Ativo"
+msgstr "Active"
+
+msgid "Atualiza titulo, conteudo, resumo ou status de um post existente, respeitando as permissoes do usuario atual."
+msgstr "Updates title, content, excerpt, or status of an existing post, respecting current user permissions."
+
+msgid "Atualizacao do WPAgent"
+msgstr "WPAgent Update"
+
+msgid "Atualizar post existente"
+msgstr "Update existing post"
+
+msgid "Baixar RTF"
+msgstr "Download RTF"
+
+msgid "Busca posts e paginas por texto para encontrar o ID correto antes de uma edicao."
+msgstr "Searches posts and pages by text to find the correct ID before an edit."
+
+msgid "Busca usuarios por nome ou e-mail."
+msgstr "Searches users by name or e-mail."
+
+msgid "Buscar posts"
+msgstr "Search posts"
+
+msgid "Buscar usuarios"
+msgstr "Search users"
+
+msgid "Cada agente exibe seu shortcode na tela de edicao e recebe seus arquivos de treinamento na propria configuracao."
+msgstr "Each agent displays its shortcode on the edit screen and receives its training files in its own configuration."
+
+msgid "Cadencia (Passos do Drip)"
+msgstr "Cadence (Drip Steps)"
+
+msgid "Campos estruturados do formulário de perfil:"
+msgstr "Structured profile form fields:"
+
+msgid "Cancelar Edicao"
+msgstr "Cancel Edit"
+
+msgid "Capacidades para criar, consultar e atualizar conteudos do WordPress."
+msgstr "Capabilities to create, query, and update WordPress content."
+
+msgid "Carregando conversas..."
+msgstr "Loading conversations..."
+
+msgid "Carregando mensagens..."
+msgstr "Loading messages..."
+
+msgid "Carregando perfil..."
+msgstr "Loading profile..."
+
+msgid "Categoria"
+msgstr "Category"
+
+msgid "Categoria com este nome ja existe."
+msgstr "Category with this name already exists."
+
+msgid "Categoria criada."
+msgstr "Category created."
+
+msgid "Categoria do Post"
+msgstr "Post Category"
+
+msgid "Chave salva. Preencha apenas para trocar."
+msgstr "Key saved. Fill only to change."
+
+msgid "Cliente de IA nao disponivel no momento."
+msgstr "AI Client currently unavailable."
+
+msgid "Clique para verificar e gerar resumos pendentes imediatamente (nao precisa esperar o cron)."
+msgstr "Click to verify and generate pending summaries immediately (no need to wait for cron)."
+
+msgid "Cole aqui o texto limpo ou Markdown..."
+msgstr "Paste clean text or Markdown here..."
+
+msgid "Cole este shortcode em qualquer página ou post do seu site."
+msgstr "Paste this shortcode on any page or post of your site."
+
+msgid "Com esta opcao ativa, novos agentes herdam os fornecedores, chaves e preferencias configuradas no plugin AI oficial. Agentes existentes podem ser ajustados individualmente na tela do agente."
+msgstr "With this option enabled, new agents inherit providers, keys, and preferences configured in the official AI plugin. Existing agents can be adjusted individually on the agent screen."
+
+msgid "Com o plano de anuidade oficial do WPAgents, você garante suporte técnico prioritário, consultoria para curadoria dos seus agentes e sequências do Mailer, além de atualizações e novas habilidades de IA para o seu WordPress."
+msgstr "With the official WPAgents annual plan, you guarantee priority technical support, consulting for agent curation and Mailer sequences, plus updates and new AI abilities for your WordPress."
+
+msgid "Comentario moderado."
+msgstr "Comment moderated."
+
+msgid "Como a IA deve gerar o corpo de cada e-mail na hora do envio."
+msgstr "How AI should generate the body of each email at send time."
+
+msgid "Como posso ajudar?"
+msgstr "How can I help?"
+
+msgid "Como usar"
+msgstr "How to use"
+
+msgid "Compartilhe informacoes que ajudam este agente a personalizar as respostas."
+msgstr "Share information that helps this agent personalize responses."
+
+msgid "Concluido"
+msgstr "Completed"
+
+msgid "Conectores de Inteligência Artificial, chaves de API, segurança e parâmetros do sistema."
+msgstr "Artificial Intelligence connectors, API keys, security, and system parameters."
+
+msgid "Configuracao do WPAgent nao encontrada nesta pagina. Atualize a pagina e tente novamente."
+msgstr "WPAgent configuration not found on this page. Refresh the page and try again."
+
+msgid "Configuracao do agente"
+msgstr "Agent configuration"
+
+msgid "Configuracao nao disponivel."
+msgstr "Configuration not available."
+
+msgid "Configurações"
+msgstr "Settings"
+
+msgid "Configurações do WPAgents"
+msgstr "WPAgents Settings"
+
+msgid "Configure a chave da OpenRouter nas opcoes do WPAgent."
+msgstr "Configure the OpenRouter key in WPAgent options."
+
+msgid "Configure a chave da OpenRouter para gerar embeddings."
+msgstr "Configure the OpenRouter key to generate embeddings."
+
+msgid "Configure a conexão global com Inteligência Artificial e crie agentes independentes."
+msgstr "Configure the global connection with Artificial Intelligence and create independent agents."
+
+msgid "Configure o limite na pagina de Configuracoes Gerais."
+msgstr "Configure the limit on the General Settings page."
+
+msgid "Conhecer Anuidade Oficial"
+msgstr "Discover Official Annual Plan"
+
+msgid "Connectors"
+msgstr "Connectors"
+
+msgid "Consultar opcao do WordPress"
+msgstr "Query WordPress option"
+
+msgid "Consumo de tokens no chat"
+msgstr "Token consumption in chat"
+
+msgid "Consumo por agente"
+msgstr "Consumption per agent"
+
+msgid "Conteudo Periodico"
+msgstr "Periodic Content"
+
+msgid "Conteudo em HTML ou texto simples."
+msgstr "Content in HTML or plain text."
+
+msgid "Contexto do site"
+msgstr "Site context"
+
+msgid "Conteúdo Periódico"
+msgstr "Periodic Content"
+
+msgid "Conteúdo Periódico do WPAgents"
+msgstr "WPAgents Periodic Content"
+
+msgid "Controla a cota máxima de consumo de tokens do agente por usuário. Digite 0 para cota ilimitada."
+msgstr "Controls the maximum token consumption quota of the agent per user. Enter 0 for unlimited quota."
+
+msgid "Controle ativo:"
+msgstr "Active control:"
+
+msgid "Controle de tokens por usuário"
+msgstr "Token control per user"
+
+msgid "Conversa"
+msgstr "Conversation"
+
+msgid "Conversa apagada"
+msgstr "Conversation deleted"
+
+msgid "Conversa renomeada"
+msgstr "Conversation renamed"
+
+msgid "Conversa salva"
+msgstr "Conversation saved"
+
+msgid "Conversas"
+msgstr "Conversations"
+
+msgid "Conversas aguardando resumo"
+msgstr "Conversations awaiting summary"
+
+msgid "Copiado"
+msgstr "Copied"
+
+msgid "Copiar resposta"
+msgstr "Copy response"
+
+msgid "Cria um novo post ou pagina como rascunho para revisao humana no WordPress."
+msgstr "Creates a new post or page as a draft for human review in WordPress."
+
+msgid "Cria uma nova categoria de posts no WordPress."
+msgstr "Creates a new post category in WordPress."
+
+msgid "Criado em"
+msgstr "Created on"
+
+msgid "Criar agendamento"
+msgstr "Create schedule"
+
+msgid "Criar categoria"
+msgstr "Create category"
+
+msgid "Criar novo agente"
+msgstr "Create new agent"
+
+msgid "Criar post como rascunho"
+msgstr "Create post as draft"
+
+msgid "Crie campanhas automáticas de e-mails, captação de leads e sequências ilimitadas no WPAgents."
+msgstr "Create automated email campaigns, lead capture, and unlimited sequences in WPAgents."
+
+msgid "Crie e treine agentes com documentos, base de conhecimento exclusiva e prompts especializados."
+msgstr "Create and train agents with documents, exclusive knowledge base, and specialized prompts."
+
+msgid "Crie rotinas automáticas para os agentes gerarem artigos em modo RASCUNHO com aprovação editorial."
+msgstr "Create automatic routines for agents to generate articles in DRAFT mode with editorial approval."
+
+msgid "Crie, treine e personalize seus Agentes de Inteligência Artificial com memória, documentos RAG e conectores."
+msgstr "Create, train, and personalize your Artificial Intelligence Agents with memory, RAG documents, and connectors."
+
+msgid "Dados coletados"
+msgstr "Data collected"
+
+msgid "Dados extraidos"
+msgstr "Data extracted"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Dashboard Central WPAgents"
+msgstr "WPAgents Central Dashboard"
+
+msgid "Data Inscrição"
+msgstr "Subscription Date"
+
+msgid "Define o papel, tom de voz, diretrizes e regras fixas de atendimento deste agente. Links externos aqui são tratados como texto; para indexar conteúdos complexos, utilize a aba de Treinamentos."
+msgstr "Defines the role, tone of voice, guidelines, and fixed service rules for this agent. External links here are treated as text; to index complex content, use the Training tab."
+
+msgid "Define se a janela do chat abre em modo claro ou escuro antes de o visitante alternar pelo botão de tema."
+msgstr "Defines whether the chat window opens in light or dark mode before the visitor toggles via the theme button."
+
+msgid "Deixe em branco (0) para permitir uso ilimitado. Os tokens são resetados automaticamente no início de cada mês."
+msgstr "Leave blank (0) to allow unlimited use. Tokens are automatically reset at the beginning of each month."
+
+msgid "Deixe em branco para herdar o modelo padrão configurado em WPAgents > Configurações."
+msgstr "Leave blank to inherit the default model configured in WPAgents > Settings."
+
+msgid "Desativado"
+msgstr "Disabled"
+
+msgid "Descadastrado"
+msgstr "Unsubscribed"
+
+msgid "Descadastrados"
+msgstr "Unsubscribed"
+
+msgid "Descadastrar"
+msgstr "Unsubscribe"
+
+msgid "Descricao opcional."
+msgstr "Optional description."
+
+msgid "Descrição orientativa para o usuário:"
+msgstr "Guiding description for the user:"
+
+msgid "Dia: %1$s / Semana: %2$s / Mes: %3$s"
+msgstr "Day: %1$s / Week: %2$s / Month: %3$s"
+
+msgid "Diagnostico de integridade do site"
+msgstr "Site integrity diagnosis"
+
+msgid "Diariamente"
+msgstr "Daily"
+
+msgid "Diario"
+msgstr "Daily"
+
+msgid "Disponível em todas as telas de administração do WordPress como assistente gerencial e consultor de tarefas."
+msgstr "Available on all WordPress administration screens as a management assistant and task consultant."
+
+msgid "Documento"
+msgstr "Document"
+
+msgid "Documento de treinamento"
+msgstr "Training document"
+
+msgid "Drip"
+msgstr "Drip"
+
+msgid "Duas vezes ao dia"
+msgstr "Twice a day"
+
+msgid "E-mail"
+msgstr "E-mail"
+
+msgid "Editar"
+msgstr "Edit"
+
+msgid "Editar Conteudo Periodico"
+msgstr "Edit Periodic Content"
+
+msgid "Editar agente"
+msgstr "Edit agent"
+
+msgid "Em Progresso"
+msgstr "In Progress"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Email agendado"
+msgstr "Scheduled email"
+
+msgid "Email agendado para "
+msgstr "Email scheduled for "
+
+msgid "Email agendado para envio."
+msgstr "Email scheduled for sending."
+
+msgid "Email enviado"
+msgstr "Email sent"
+
+msgid "Email enviado para "
+msgstr "Email sent to "
+
+msgid "Email preparado"
+msgstr "Email prepared"
+
+msgid "Emails enviados"
+msgstr "Sent emails"
+
+msgid "Embeddings"
+msgstr "Embeddings"
+
+msgid "Embeddings desativados."
+msgstr "Embeddings disabled."
+
+msgid "Enter envia. Shift + Enter quebra linha."
+msgstr "Enter sends. Shift + Enter breaks line."
+
+msgid "Entrada"
+msgstr "Input"
+
+msgid "Entre na conta para renomear conversas"
+msgstr "Log in to rename conversations"
+
+msgid "Entre na conta para salvar e retomar conversas."
+msgstr "Log in to save and resume conversations."
+
+msgid "Enviando email..."
+msgstr "Sending email..."
+
+msgid "Enviar"
+msgstr "Send"
+
+msgid "Enviar email"
+msgstr "Send email"
+
+msgid "Enviar este email agora?"
+msgstr "Send this email now?"
+
+msgid "Envie documentos para compor a base pesquisavel deste agente. O WPAgent quebra textos longos em trechos e usa somente os trechos relevantes em cada resposta."
+msgstr "Send documents to compose this agent's searchable base. WPAgent breaks long texts into snippets and uses only relevant snippets in each response."
+
+msgid "Envie uma mensagem para o agente."
+msgstr "Send a message to the agent."
+
+msgid "Envio de e-mails"
+msgstr "Sending e-mails"
+
+msgid "Envios"
+msgstr "Sends"
+
+msgid "Erro ao apagar conversa"
+msgstr "Error deleting conversation"
+
+msgid "Erro ao carregar conversa"
+msgstr "Error loading conversation"
+
+msgid "Erro ao carregar perfil"
+msgstr "Error loading profile"
+
+msgid "Erro ao chamar a OpenRouter."
+msgstr "Error calling OpenRouter."
+
+msgid "Erro ao criar conversa"
+msgstr "Error creating conversation"
+
+msgid "Erro ao enviar email"
+msgstr "Error sending email"
+
+msgid "Erro ao executar acao"
+msgstr "Error executing action"
+
+msgid "Erro ao executar tarefa de conteudo: %s"
+msgstr "Error executing content task: %s"
+
+msgid "Erro ao gerar embeddings."
+msgstr "Error generating embeddings."
+
+msgid "Erro ao gerar o conteudo do e-mail."
+msgstr "Error generating email content."
+
+msgid "Erro ao gerar o resumo."
+msgstr "Error generating summary."
+
+msgid "Erro ao renomear conversa"
+msgstr "Error renaming conversation"
+
+msgid "Erro ao responder"
+msgstr "Error responding"
+
+msgid "Erro ao salvar perfil"
+msgstr "Error saving profile"
+
+msgid "Erro ao salvar. Verifique se preencheu todos os campos."
+msgstr "Error saving. Check if all fields are filled."
+
+msgid "Erro de configuracao"
+msgstr "Configuration error"
+
+msgid "Erro no WPAgent. Status "
+msgstr "WPAgent Error. Status "
+
+msgid "Escreva sua mensagem..."
+msgstr "Write your message..."
+
+msgid "Escreva uma pergunta ou escolha uma conversa anterior."
+msgstr "Write a question or choose a previous conversation."
+
+msgid "Este agente atingiu o limite %1$s de %2$s tokens. Tente novamente depois ou fale com o administrador."
+msgstr "This agent reached the limit %1$s of %2$s tokens. Try again later or contact the administrator."
+
+msgid "Este agente nao esta habilitado como assistente interno do admin."
+msgstr "This agent is not enabled as an internal admin assistant."
+
+msgid "Este agente nao esta habilitado para agendamentos de e-mail."
+msgstr "This agent is not enabled for email scheduling."
+
+msgid "Este agente nao esta habilitado para enviar emails."
+msgstr "This agent is not enabled to send emails."
+
+msgid "Este e-mail ja esta inscrito neste agendamento."
+msgstr "This email is already subscribed to this schedule."
+
+msgid "Every five minutes"
+msgstr "Every five minutes"
+
+msgid "Ex.: ano em que leciono, estilo de aula, objetivos e preferencias..."
+msgstr "Ex.: year I teach, class style, goals, and preferences..."
+
+msgid "Ex.: envie apenas relatórios revisados; inclua saudação formal; não insira anexos."
+msgstr "Ex.: send only reviewed reports; include formal greeting; do not insert attachments."
+
+msgid "Ex: Escreva um artigo completo sobre tecnicas de SEO para WordPress com exemplos práticos."
+msgstr "Ex: Write a complete article on SEO techniques for WordPress with practical examples."
+
+msgid "Excluir"
+msgstr "Delete"
+
+msgid "Executando acao..."
+msgstr "Executing action..."
+
+msgid "Executar Agora"
+msgstr "Execute Now"
+
+msgid "Executar acao"
+msgstr "Execute action"
+
+msgid "Executar esta acao no WordPress?"
+msgstr "Execute this action in WordPress?"
+
+msgid "Exibir este agente automaticamente como widget flutuante no painel administrativo do WordPress."
+msgstr "Display this agent automatically as a floating widget in the WordPress admin dashboard."
+
+msgid "Exibir este agente automaticamente como widget/pop-up no front-end do site para visitantes."
+msgstr "Display this agent automatically as a widget/pop-up on the site front-end for visitors."
+
+msgid "Exibir o consumo mensal de tokens do usuário logado na interface do shortcode."
+msgstr "Display the logged user's monthly token consumption in the shortcode interface."
+
+msgid "Explique quais informações ajudam este agente a personalizar o atendimento."
+msgstr "Explain what information helps this agent personalize service."
+
+msgid "Exportar CSV"
+msgstr "Export CSV"
+
+msgid "Extracao insuficiente"
+msgstr "Insufficient extraction"
+
+msgid "Extraindo texto e criando indice."
+msgstr "Extracting text and creating index."
+
+msgid "Falhas"
+msgstr "Failures"
+
+msgid "Fechar"
+msgstr "Close"
+
+msgid "Fechar assistente"
+msgstr "Close assistant"
+
+msgid "Filtrar"
+msgstr "Filter"
+
+msgid "Filtrar por funcao (ex: administrator, editor, author)."
+msgstr "Filter by role (e.g., administrator, editor, author)."
+
+msgid "Finalidade"
+msgstr "Purpose"
+
+msgid "Fornecedor de IA"
+msgstr "AI Provider"
+
+msgid "Frequencia"
+msgstr "Frequency"
+
+msgid "Gerado em"
+msgstr "Generated on"
+
+msgid "Geral"
+msgstr "General"
+
+msgid "Gerar resumo"
+msgstr "Generate summary"
+
+msgid "Gerar resumo automático da conversa após período de inatividade do visitante."
+msgstr "Generate automatic conversation summary after visitor inactivity period."
+
+msgid "Gerenciamento de conteudo"
+msgstr "Content management"
+
+msgid "Gerenciar Agentes →"
+msgstr "Manage Agents →"
+
+msgid "Habilitar abas de projetos no topo do chat para este agente."
+msgstr "Enable project tabs at the top of the chat for this agent."
+
+msgid "Histórico completo de conversas dos seus visitantes com resumos e insights automáticos por IA."
+msgstr "Complete visitor conversation history with automatic AI summaries and insights."
+
+msgid "Histórico completo, resumos e insights das interações com seus visitantes."
+msgstr "Complete history, summaries, and insights of interactions with your visitors."
+
+msgid "Hoje"
+msgstr "Today"
+
+msgid "Horas de inatividade antes de gerar o resumo:"
+msgstr "Hours of inactivity before generating the summary:"
+
+msgid "ID da categoria pai (0 para nenhuma)."
+msgstr "Parent category ID (0 for none)."
+
+msgid "ID do comentario."
+msgstr "Comment ID."
+
+msgid "ID do post a atualizar."
+msgstr "Post ID to update."
+
+msgid "ID do post ou pagina."
+msgstr "Post or page ID."
+
+msgid "ID opcional do post."
+msgstr "Optional post ID."
+
+msgid "ID: %d"
+msgstr "ID: %d"
+
+msgid "Identificacao do Agendamento"
+msgstr "Schedule Identification"
+
+msgid "Identificador"
+msgstr "Identifier"
+
+msgid "Identificador (Slug)"
+msgstr "Identifier (Slug)"
+
+msgid "Ilimitado"
+msgstr "Unlimited"
+
+msgid "Indexado"
+msgstr "Indexed"
+
+msgid "Indexando texto manual."
+msgstr "Indexing manual text."
+
+msgid "Indice"
+msgstr "Index"
+
+msgid "Informacoes do site"
+msgstr "Site information"
+
+msgid "Informe um e-mail valido para o agendamento."
+msgstr "Provide a valid e-mail for scheduling."
+
+msgid "Informe um email valido para o envio."
+msgstr "Provide a valid email for sending."
+
+msgid "Informe um nome para a conversa."
+msgstr "Provide a name for the conversation."
+
+msgid "Injetar informações públicas do site no contexto do agente (homepage, páginas, posts recentes)."
+msgstr "Inject public site information into the agent's context (homepage, pages, recent posts)."
+
+msgid "Inscricao atualizada."
+msgstr "Subscription updated."
+
+msgid "Inscricao cancelada"
+msgstr "Subscription canceled"
+
+msgid "Inscricao confirmada. O proximo envio esta agendado."
+msgstr "Subscription confirmed. The next send is scheduled."
+
+msgid "Inscrito"
+msgstr "Subscribed"
+
+msgid "Inscritos"
+msgstr "Subscribers"
+
+msgid "Inscritos na Sequência Drip"
+msgstr "Subscribers in the Drip Sequence"
+
+msgid "Instrucao base padrao"
+msgstr "Default base instruction"
+
+msgid "Instrucao de conteudo"
+msgstr "Content instruction"
+
+msgid "Instrucoes de Conteudo"
+msgstr "Content Instructions"
+
+msgid "Instrução base (System Prompt)"
+msgstr "Base instruction (System Prompt)"
+
+msgid "Instruções adicionais para os e-mails enviados:"
+msgstr "Additional instructions for emails sent:"
+
+msgid "Interacoes"
+msgstr "Interactions"
+
+msgid "Interacoes recentes"
+msgstr "Recent interactions"
+
+msgid "Interações"
+msgstr "Interactions"
+
+msgid "Ir para Configurações"
+msgstr "Go to Settings"
+
+msgid "Leads"
+msgstr "Leads"
+
+msgid "Leads por email"
+msgstr "Email Leads"
+
+msgid "Leads recentes"
+msgstr "Recent leads"
+
+msgid "Limite de tokens mensal atingido. Entre em contato com o administrador."
+msgstr "Monthly token limit reached. Contact the administrator."
+
+msgid "Limite mensal por usuário"
+msgstr "Monthly limit per user"
+
+msgid "Limite:"
+msgstr "Limit:"
+
+msgid "Limites"
+msgstr "Limits"
+
+msgid "Limites de contexto & memória"
+msgstr "Context & memory limits"
+
+msgid "Limites de tokens por usuário"
+msgstr "Token limits per user"
+
+msgid "Limites padrao"
+msgstr "Default limits"
+
+msgid "Lista as categorias de posts existentes."
+msgstr "Lists existing post categories."
+
+msgid "Lista comentarios para revisao, incluindo pendentes, aprovados, spam ou lixeira."
+msgstr "Lists comments for review, including pending, approved, spam, or trashed."
+
+msgid "Lista itens da biblioteca de midia."
+msgstr "Lists media library items."
+
+msgid "Lista os menus de navegacao registrados e seus itens."
+msgstr "Lists registered navigation menus and their items."
+
+msgid "Lista paginas do WordPress por titulo, status e data."
+msgstr "Lists WordPress pages by title, status, and date."
+
+msgid "Lista plugins instalados com status (ativo/inativo)."
+msgstr "Lists installed plugins with status (active/inactive)."
+
+msgid "Lista temas instalados indicando qual esta ativo."
+msgstr "Lists installed themes indicating which one is active."
+
+msgid "Lista usuarios do WordPress com funcoes e status."
+msgstr "Lists WordPress users with roles and statuses."
+
+msgid "Listar categorias"
+msgstr "List categories"
+
+msgid "Listar menus de navegacao"
+msgstr "List navigation menus"
+
+msgid "Listar midia"
+msgstr "List media"
+
+msgid "Listar paginas"
+msgstr "List pages"
+
+msgid "Listar plugins"
+msgstr "List plugins"
+
+msgid "Listar temas"
+msgstr "List themes"
+
+msgid "Listar usuarios"
+msgstr "List users"
+
+msgid "Lote por cron"
+msgstr "Batch per cron"
+
+msgid "Maiores consumos por usuario"
+msgstr "Highest usage per user"
+
+msgid "Maximo de envios por inscrito"
+msgstr "Maximum sends per subscriber"
+
+msgid "Memorias"
+msgstr "Memories"
+
+msgid "Memórias"
+msgstr "Memories"
+
+msgid "Mensagem"
+msgstr "Message"
+
+msgid "Mensal"
+msgstr "Monthly"
+
+msgid "Mes"
+msgstr "Month"
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Modelo"
+msgstr "Model"
+
+msgid "Modelo OpenRouter direto"
+msgstr "Direct OpenRouter model"
+
+msgid "Modelo do agente no WordPress AI"
+msgstr "Agent model in WordPress AI"
+
+msgid "Modelo efetivo atual: %1$s / %2$s"
+msgstr "Current effective model: %1$s / %2$s"
+
+msgid "Modelo padrao do WordPress AI"
+msgstr "Default WordPress AI model"
+
+msgid "Modo Mailer e Drip: construa sequências de e-mails automatizadas, capture leads e nutra relacionamentos."
+msgstr "Mailer and Drip mode: build automated email sequences, capture leads, and nurture relationships."
+
+msgid "Modo claro"
+msgstr "Light mode"
+
+msgid "Modo escuro"
+msgstr "Dark mode"
+
+msgid "Monitoramento em tempo real do consumo de tokens OpenAI/Gemini e gestão de custos por modelo."
+msgstr "Real-time monitoring of OpenAI/Gemini token consumption and cost management per model."
+
+msgid "Muitas mensagens em pouco tempo. Aguarde um minuto e tente novamente."
+msgstr "Too many messages in a short time. Wait a minute and try again."
+
+msgid "Muitos emails solicitados em pouco tempo. Aguarde e tente novamente."
+msgstr "Too many emails requested in a short time. Wait and try again."
+
+msgid "Nao"
+msgstr "No"
+
+msgid "Nao foi possivel abrir o arquivo DOCX."
+msgstr "Could not open DOCX file."
+
+msgid "Nao foi possivel agendar o envio do email."
+msgstr "Could not schedule email send."
+
+msgid "Nao foi possivel apagar esta conversa."
+msgstr "Could not delete this conversation."
+
+msgid "Nao foi possivel atualizar o comentario."
+msgstr "Could not update comment."
+
+msgid "Nao foi possivel carregar conversas"
+msgstr "Could not load conversations"
+
+msgid "Nao foi possivel concluir a resposta do provedor de IA. Tente novamente em instantes."
+msgstr "Could not complete AI provider response. Try again shortly."
+
+msgid "Nao foi possivel copiar"
+msgstr "Could not copy"
+
+msgid "Nao foi possivel enviar %1$s: %2$s"
+msgstr "Could not send %1$s: %2$s"
+
+msgid "Nao foi possivel gerar o RTF"
+msgstr "Could not generate RTF"
+
+msgid "Nao foi possivel ler o arquivo enviado."
+msgstr "Could not read uploaded file."
+
+msgid "Nao foi possivel localizar o texto principal do DOCX."
+msgstr "Could not find main text in DOCX."
+
+msgid "Nao foi possivel registrar a fonte de treinamento."
+msgstr "Could not register training source."
+
+msgid "Nao foi possivel registrar a inscricao."
+msgstr "Could not register subscription."
+
+msgid "Nao foi possivel registrar o email para envio."
+msgstr "Could not register email for sending."
+
+msgid "Nao foi possivel salvar o perfil do usuario."
+msgstr "Could not save user profile."
+
+msgid "Nao ha lote automatico agendado no momento. Salve as configuracoes com embeddings ativos para agendar."
+msgstr "There is no automatic batch scheduled at the moment. Save settings with active embeddings to schedule."
+
+msgid "Nenhum agendamento ainda. Crie um manualmente ou ative os e-mails recorrentes em um agente para que ele proponha agendamentos no chat."
+msgstr "No schedules yet. Create one manually or enable recurring emails on an agent so it proposes schedules in chat."
+
+msgid "Nenhum chunk pendente para embeddings."
+msgstr "No chunk pending for embeddings."
+
+msgid "Nenhum conteudo periodico configurado ainda."
+msgstr "No periodic content configured yet."
+
+msgid "Nenhum dado de uso de tokens encontrado."
+msgstr "No token usage data found."
+
+msgid "Nenhum documento indexado ainda."
+msgstr "No document indexed yet."
+
+msgid "Nenhum inscrito para o filtro selecionado."
+msgstr "No subscriber for the selected filter."
+
+msgid "Nenhum lead por email registrado ainda."
+msgstr "No email leads registered yet."
+
+msgid "Nenhum provedor de IA configurado para gerar o e-mail."
+msgstr "No AI provider configured to generate the email."
+
+msgid "Nenhum provedor de IA configurado."
+msgstr "No AI provider configured."
+
+msgid "Nenhum rascunho gerado"
+msgstr "No draft generated"
+
+msgid "Nenhum resumo gerado ainda. Os resumos sao produzidos automaticamente quando o agente tem a opcao ativada e a conversa fica inativa por 4 horas."
+msgstr "No summary generated yet. Summaries are automatically produced when the agent has the option enabled and the conversation is inactive for 4 hours."
+
+msgid "Nenhum texto util foi encontrado neste documento."
+msgstr "No useful text found in this document."
+
+msgid "Nenhum uso registrado ainda."
+msgstr "No usage recorded yet."
+
+msgid "Nenhuma conversa salva ainda."
+msgstr "No conversations saved yet."
+
+msgid "Nesta primeira versao, o provider suportado e openrouter via /api/v1/embeddings. Os embeddings sao gerados em segundo plano pelo WP-Cron."
+msgstr "In this first version, the supported provider is openrouter via /api/v1/embeddings. Embeddings are generated in the background by WP-Cron."
+
+msgid "Nome"
+msgstr "Name"
+
+msgid "Nome / Agente"
+msgstr "Name / Agent"
+
+msgid "Nome da categoria e obrigatorio."
+msgstr "Category name is mandatory."
+
+msgid "Nome da categoria."
+msgstr "Category name."
+
+msgid "Nome da conversa"
+msgstr "Conversation name"
+
+msgid "Nome da opcao do WordPress a consultar."
+msgstr "Name of the WordPress option to query."
+
+msgid "Nome interno para identificar esta rotina de postagem."
+msgstr "Internal name to identify this posting routine."
+
+msgid "Nome ou e-mail para buscar."
+msgstr "Name or email to search."
+
+msgid "Nova"
+msgstr "New"
+
+msgid "Nova aba / projeto"
+msgstr "New tab / project"
+
+msgid "Nova conversa"
+msgstr "New conversation"
+
+msgid "Nova conversa iniciada"
+msgstr "New conversation started"
+
+msgid "Novo Conteudo Periodico"
+msgstr "New Periodic Content"
+
+msgid "Novo conteudo opcional em HTML ou texto simples."
+msgstr "New optional content in HTML or plain text."
+
+msgid "Novo projeto"
+msgstr "New project"
+
+msgid "Novo resumo opcional."
+msgstr "New optional summary."
+
+msgid "Novo status opcional."
+msgstr "New optional status."
+
+msgid "Novo titulo opcional."
+msgstr "New optional title."
+
+msgid "Novo titulo."
+msgstr "New title."
+
+msgid "O WordPress AI Client nao esta disponivel."
+msgstr "The WordPress AI Client is not available."
+
+msgid "O WordPress nao conseguiu enviar o email. Verifique a configuracao SMTP/hospedagem."
+msgstr "WordPress could not send the email. Check SMTP/hosting configuration."
+
+msgid "O agendamento de email do WPAgent nao esta disponivel."
+msgstr "WPAgent email scheduling is not available."
+
+msgid "O agendamento precisa de instrucoes de conteudo (content_prompt)."
+msgstr "The schedule requires content instructions (content_prompt)."
+
+msgid "O agente coleta o nome, e-mail e dados necessários durante a conversa. O disparo final ocorre quando o visitante clica no botão de confirmação gerado pelo WPAgents."
+msgstr "The agent collects name, email and required data during chat. The final send happens when the visitor clicks the WPAgents confirmation button."
+
+msgid "O agente oferecerá esta sequência no chat e o WordPress enviará cada passo automaticamente nos horários definidos abaixo."
+msgstr "The agent will offer this sequence in chat, and WordPress will automatically send each step at the times set below."
+
+msgid "O agente selecionado usara seu proprio conhecimento e personalidade para criar o post."
+msgstr "The selected agent will use its own knowledge and personality to create the post."
+
+msgid "O caminho recomendado e configurar OpenAI, Gemini, Claude, OpenRouter ou outros provedores no plugin AI oficial do WordPress em Settings > Connectors. O WPAgent usa essa configuracao para chats e tarefas de IA quando disponivel."
+msgstr "The recommended path is to configure OpenAI, Gemini, Claude, OpenRouter, or other providers in the official WordPress AI plugin under Settings > Connectors. WPAgent uses this configuration for chats and AI tasks when available."
+
+msgid "O email agendado perdeu destinatario, assunto ou conteudo valido."
+msgstr "The scheduled email lost valid recipient, subject, or content."
+
+msgid "O email precisa de assunto e conteudo antes do envio."
+msgstr "The email requires subject and content before sending."
+
+msgid "O envio de email do WPAgent nao esta disponivel."
+msgstr "WPAgent email sending is not available."
+
+msgid "O fornecedor de IA respondeu sem conteudo."
+msgstr "AI provider responded without content."
+
+msgid "O provedor de IA demorou demais para responder. Tente novamente em instantes."
+msgstr "The AI provider took too long to respond. Try again shortly."
+
+msgid "O provedor de IA nao retornou conteudo."
+msgstr "AI provider did not return content."
+
+msgid "O provedor devolveu resposta vazia."
+msgstr "Provider returned empty response."
+
+msgid "O provedor nao retornou embedding."
+msgstr "Provider did not return embedding."
+
+msgid "O servidor ou provedor de IA ficou indisponivel por alguns instantes. Tente novamente."
+msgstr "Server or AI provider temporarily unavailable. Try again."
+
+msgid "O servidor retornou uma pagina de erro em vez de uma resposta do WPAgent. Tente novamente em instantes."
+msgstr "The server returned an error page instead of a WPAgent response. Try again shortly."
+
+msgid "O usuario atual nao tem permissao para executar esta ability."
+msgstr "Current user lacks permission to execute this ability."
+
+msgid "Objetivo"
+msgstr "Objective"
+
+msgid "Observacoes adicionais"
+msgstr "Additional remarks"
+
+msgid "Opcao nao encontrada."
+msgstr "Option not found."
+
+msgid "Opcao nao permitida para consulta."
+msgstr "Option not permitted for query."
+
+msgid "Opcional. Quando preenchido, o WPAgent envia este provider/model como preferencia para o WordPress AI Client. Deixe em branco para usar o modelo padrao escolhido pelo conector/plugin AI."
+msgstr "Optional. When filled, WPAgent sends this provider/model preference to the WordPress AI Client. Leave blank to use the default model chosen by the AI connector/plugin."
+
+msgid "OpenRouter API key opcional"
+msgstr "Optional OpenRouter API key"
+
+msgid "OpenRouter direto pelo WPAgent"
+msgstr "Direct OpenRouter via WPAgent"
+
+msgid "Os resumos gerados pela IA são exibidos no menu \"Atendimentos\" para consulta e acompanhamento da equipe de suporte."
+msgstr "AI-generated summaries are displayed in the \"Customer Service\" menu for reference and support team follow-up."
+
+msgid "PDF recebido, mas nao foi possivel extrair texto dele. Instale pdftotext no servidor, use um PDF com texto selecionavel ou conecte um extrator/OCR pelo filtro wpagent_extract_pdf_text."
+msgstr "PDF received, but couldn't extract text. Install pdftotext on server, use a selectable-text PDF, or connect an extractor/OCR via wpagent_extract_pdf_text filter."
+
+msgid "Padrao: visitantes anonimos"
+msgstr "Default: anonymous visitors"
+
+msgid "Passo %1$d de %2$d"
+msgstr "Step %1$d of %2$d"
+
+msgid "Passos da sequencia"
+msgstr "Sequence steps"
+
+msgid "Pausado"
+msgstr "Paused"
+
+msgid "Pausar"
+msgstr "Pause"
+
+msgid "Perfil carregado"
+msgstr "Profile loaded"
+
+msgid "Perfil declarado pelo usuário"
+msgstr "User-declared profile"
+
+msgid "Perfil opcional"
+msgstr "Optional profile"
+
+msgid "Perfil salvo"
+msgstr "Profile saved"
+
+msgid "Periodicidade"
+msgstr "Periodicity"
+
+msgid "Periodos atuais: dia desde %1$s, semana desde %2$s, mes desde %3$s."
+msgstr "Current periods: day since %1$s, week since %2$s, month since %3$s."
+
+msgid "Permite que o visitante crie múltiplas abas de atendimento no topo da janela do chat, cada uma gerenciando um projeto ou assunto independente com histórico próprio."
+msgstr "Allows the visitor to create multiple chat tabs at the top of the window, each managing an independent project or subject with its own history."
+
+msgid "Permitir chat sem login de usuário (visitantes não autenticados)."
+msgstr "Allow chat without user login (unauthenticated visitors)."
+
+msgid "Permitir chat sem login para novos agentes."
+msgstr "Allow chat without login for new agents."
+
+msgid "Permitir que este agente prepare e envie e-mails após confirmação explícita do usuário."
+msgstr "Allow this agent to prepare and send emails after explicit user confirmation."
+
+msgid "Permitir que usuários informem dados pessoais para o agente considerar nas respostas."
+msgstr "Allow users to provide personal data for the agent to consider in responses."
+
+msgid "Plugin AI do WordPress"
+msgstr "WordPress AI Plugin"
+
+msgid "Pode usar {{nome}} e {{email}}."
+msgstr "Can use {{nome}} and {{email}}."
+
+msgid "Por dia"
+msgstr "Per day"
+
+msgid "Por mês"
+msgstr "Per month"
+
+msgid "Por semana"
+msgstr "Per week"
+
+msgid "Post atualizado."
+msgstr "Post updated."
+
+msgid "Potencialize seus Agentes com Configuração Sob Medida & Suporte Premium"
+msgstr "Boost your Agents with Tailor-Made Configuration & Premium Support"
+
+msgid "Preencha somente se quiser usar OpenRouter direto pelo WPAgent ou manter um fallback proprio. Se houver um conector OpenRouter no WordPress AI, o WPAgent tambem tenta espelhar esta chave para ele."
+msgstr "Fill only if you want to use OpenRouter directly via WPAgent or keep a custom fallback. If there's an OpenRouter connector in WordPress AI, WPAgent also tries to mirror this key to it."
+
+msgid "Preparei um agendamento de e-mails para sua confirmacao."
+msgstr "I prepared an email schedule for your confirmation."
+
+msgid "Preparei um email para sua revisao."
+msgstr "I prepared an email for your review."
+
+msgid "Preparei uma acao administrativa para sua revisao."
+msgstr "I prepared an administrative action for your review."
+
+msgid "Primeiro registro"
+msgstr "First record"
+
+msgid "Processamento concluído: %d resumo(s) gerado(s)."
+msgstr "Processing complete: %d summary(s) generated."
+
+msgid "Processando"
+msgstr "Processing"
+
+msgid "Processando resposta..."
+msgstr "Processing response..."
+
+msgid "Processar embeddings agora"
+msgstr "Process embeddings now"
+
+msgid "Processar resumos agora"
+msgstr "Process summaries now"
+
+msgid "Progresso"
+msgstr "Progress"
+
+msgid "Pronto para conversar"
+msgstr "Ready to chat"
+
+msgid "Provedor padrao"
+msgstr "Default provider"
+
+msgid "Provider"
+msgstr "Provider"
+
+msgid "Provider de embeddings ainda nao suportado."
+msgstr "Embeddings provider not yet supported."
+
+msgid "Proximo Envio"
+msgstr "Next Send"
+
+msgid "Proximo lote automatico: %s."
+msgstr "Next automatic batch: %s."
+
+msgid "Quando ativado, cada usuário terá um limite mensal de tokens. Administradores não são limitados. O limite pode ser 0 para ilimitado."
+msgstr "When enabled, each user will have a monthly token limit. Admins are not limited. The limit can be 0 for unlimited."
+
+msgid "Quando ativo, o agente consulta automaticamente os conteúdos publicados do site para responder dúvidas institucionais com precisão."
+msgstr "When active, the agent automatically queries published site content to accurately answer institutional questions."
+
+msgid "Quantidade maxima de resultados."
+msgstr "Maximum number of results."
+
+msgid "Quantidade maxima."
+msgstr "Maximum amount."
+
+msgid "RTF gerado"
+msgstr "RTF generated"
+
+msgid "Rascunho WPAgent"
+msgstr "WPAgent Draft"
+
+msgid "Rascunho criado."
+msgstr "Draft created."
+
+msgid "Rascunho de conteúdo gerado com sucesso! <a href=\"%s\" target=\"_blank\">Clique aqui para revisar o Rascunho #%d</a>."
+msgstr "Content draft generated successfully! <a href=\"%s\" target=\"_blank\">Click here to review Draft #%d</a>."
+
+msgid "Receberam Tudo"
+msgstr "Received Everything"
+
+msgid "Recorrente"
+msgstr "Recurring"
+
+msgid "Reindexar"
+msgstr "Reindex"
+
+msgid "Relatórios"
+msgstr "Reports"
+
+msgid "Relatórios do WPAgents"
+msgstr "WPAgents Reports"
+
+msgid "Remover"
+msgstr "Remove"
+
+msgid "Renomeando conversa..."
+msgstr "Renaming conversation..."
+
+msgid "Renomear"
+msgstr "Rename"
+
+msgid "Repositorio nao disponivel."
+msgstr "Repository not available."
+
+msgid "Resetar"
+msgstr "Reset"
+
+msgid "Resetar Tokens"
+msgstr "Reset Tokens"
+
+msgid "Resetar Uso de Usuario"
+msgstr "Reset User Usage"
+
+msgid "Resposta recebida"
+msgstr "Response received"
+
+msgid "Resumo"
+msgstr "Summary"
+
+msgid "Resumo da conversa gerado com sucesso."
+msgstr "Conversation summary generated successfully."
+
+msgid "Resumo de Uso Mensal"
+msgstr "Monthly Usage Summary"
+
+msgid "Resumo de conversas por IA"
+msgstr "AI conversation summary"
+
+msgid "Resumo opcional."
+msgstr "Optional summary."
+
+msgid "Resumos automaticos das conversas de cada agente, gerados apos periodo de inatividade, para consulta e follow-up humano."
+msgstr "Automatic summaries of each agent's conversations, generated after a period of inactivity, for reference and human follow-up."
+
+msgid "Retomar"
+msgstr "Resume"
+
+msgid "Retorna dados de saude do WordPress: versao PHP, MySQL, HTTPS, limites de memoria e extensoes."
+msgstr "Returns WordPress health data: PHP version, MySQL, HTTPS, memory limits, and extensions."
+
+msgid "Retorna informacoes gerais do site: titulo, descricao, versao do WP, tema ativo, plugins ativos e total de conteudo."
+msgstr "Returns general site information: title, description, WP version, active theme, active plugins, and total content."
+
+msgid "Retorna o valor de uma opcao de configuracao do WordPress (como blogname, blogdescription, posts_per_page)."
+msgstr "Returns the value of a WordPress configuration option (like blogname, blogdescription, posts_per_page)."
+
+msgid "Revisar Rascunho #%d"
+msgstr "Review Draft #%d"
+
+msgid "Rotinas de Conteúdo →"
+msgstr "Content Routines →"
+
+msgid "Saida"
+msgstr "Output"
+
+msgid "Salvando perfil..."
+msgstr "Saving profile..."
+
+msgid "Salvar Alteracoes"
+msgstr "Save Changes"
+
+msgid "Salvar agendamento"
+msgstr "Save schedule"
+
+msgid "Salvar perfil"
+msgstr "Save profile"
+
+msgid "Se true, mostra apenas ativos. Se false, apenas inativos. Se omitido, mostra todos."
+msgstr "If true, shows only active. If false, only inactive. If omitted, shows all."
+
+msgid "Sem categoria"
+msgstr "Uncategorized"
+
+msgid "Sem permissao."
+msgstr "No permission."
+
+msgid "Sem texto"
+msgstr "No text"
+
+msgid "Semana"
+msgstr "Week"
+
+msgid "Semanal"
+msgstr "Weekly"
+
+msgid "Semanalmente"
+msgstr "Weekly"
+
+msgid "Sequencia"
+msgstr "Sequence"
+
+msgid "Sequencia de e-mails"
+msgstr "Email sequence"
+
+msgid "Sequência Drip (Envio progressivo por passos)"
+msgstr "Drip Sequence (Progressive sending by steps)"
+
+msgid "Shortcode"
+msgstr "Shortcode"
+
+msgid "Sim"
+msgstr "Yes"
+
+msgid "Slug ou ID do menu especifico. Se omitido, lista todos."
+msgstr "Specific menu slug or ID. If omitted, lists all."
+
+msgid "Sobre voce"
+msgstr "About you"
+
+msgid "Sobre você"
+msgstr "About you"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Status das paginas."
+msgstr "Page status."
+
+msgid "Status do Drip"
+msgstr "Drip Status"
+
+msgid "Status dos comentarios."
+msgstr "Comment status."
+
+msgid "Status recente"
+msgstr "Recent status"
+
+msgid "Status:"
+msgstr "Status:"
+
+msgid "Suas conversas"
+msgstr "Your conversations"
+
+msgid "Suporte & Anuidade"
+msgstr "Support & Annual Plan"
+
+msgid "TXT, Markdown, CSV, JSON, HTML e DOCX sao extraidos automaticamente. PDF e tentado apenas quando houver texto legivel; se a extracao sair corrompida, ele nao sera usado no chat."
+msgstr "TXT, Markdown, CSV, JSON, HTML and DOCX are extracted automatically. PDF is attempted only if readable text exists; if corrupted, it won't be used in chat."
+
+msgid "Tem certeza que deseja excluir esta rotina?"
+msgstr "Are you sure you want to delete this routine?"
+
+msgid "Tem certeza que deseja resetar o uso de tokens deste usuario?"
+msgstr "Are you sure you want to reset token usage for this user?"
+
+msgid "Tem certeza?"
+msgstr "Are you sure?"
+
+msgid "Texto manual de treinamento"
+msgstr "Manual training text"
+
+msgid "Texto opcional para buscar."
+msgstr "Optional text to search."
+
+msgid "Texto para buscar no titulo ou conteudo."
+msgstr "Text to search in title or content."
+
+msgid "Texto para buscar no titulo."
+msgstr "Text to search in title."
+
+msgid "Tipo de Agendamento"
+msgstr "Schedule Type"
+
+msgid "Tipo de arquivo ainda nao suportado para extracao automatica."
+msgstr "File type not yet supported for automatic extraction."
+
+msgid "Tipo de post. Use post ou page."
+msgstr "Post type. Use post or page."
+
+msgid "Tipo de post. Use post, page ou any."
+msgstr "Post type. Use post, page, or any."
+
+msgid "Titulo atualizado."
+msgstr "Title updated."
+
+msgid "Titulo da fonte, ex.: BNCC em Markdown"
+msgstr "Source title, ex: BNCC in Markdown"
+
+msgid "Titulo do conteudo."
+msgstr "Content title."
+
+msgid "Todos"
+msgstr "All"
+
+msgid "Todos os agentes"
+msgstr "All agents"
+
+msgid "Tokens este mes"
+msgstr "Tokens this month"
+
+msgid "Tokens este mês:"
+msgstr "Tokens this month:"
+
+msgid "Top usuarios por uso:"
+msgstr "Top users by usage:"
+
+msgid "Topico"
+msgstr "Topic"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Total de Tokens"
+msgstr "Total Tokens"
+
+msgid "Total de eventos"
+msgstr "Total events"
+
+msgid "Total de tokens este mes:"
+msgstr "Total tokens this month:"
+
+msgid "Total: %s tokens de %s usuários ativos"
+msgstr "Total: %s tokens from %s active users"
+
+msgid "Treinamentos"
+msgstr "Training"
+
+msgid "Treinamentos: quantidade máxima de trechos documentais da base RAG enviados na requisição. Memórias: registros de contexto pessoal. Interações: pares recentes de pergunta e resposta."
+msgstr "Training: maximum number of RAG base documentary snippets sent in request. Memories: personal context records. Interactions: recent question and answer pairs."
+
+msgid "Título do botão/campo do perfil:"
+msgstr "Profile button/field title:"
+
+msgid "Ultima interacao"
+msgstr "Last interaction"
+
+msgid "Ultimo Envio"
+msgstr "Last Send"
+
+msgid "Ultimo Rascunho Criado"
+msgstr "Last Draft Created"
+
+msgid "Ultimo assunto"
+msgstr "Last subject"
+
+msgid "Ultimo email"
+msgstr "Last email"
+
+msgid "Ultimo processamento:"
+msgstr "Last processing:"
+
+msgid "Ultimo uso"
+msgstr "Last usage"
+
+msgid "Um campo por linha no formato: Rótulo | chave | tipo | placeholder (tipos aceitos: text ou textarea). As respostas entram no prompt do agente."
+msgstr "One field per line in format: Label | key | type | placeholder (accepted types: text or textarea). Responses enter agent prompt."
+
+msgid "Uma linha por passo no formato: horas a partir da inscricao | rotulo. Usado apenas para sequencia."
+msgstr "One line per step in format: hours from subscription | label. Used only for sequence."
+
+msgid "Usar WordPress AI / Connectors como provedor padrao para novos agentes."
+msgstr "Use WordPress AI / Connectors as default provider for new agents."
+
+msgid "Use WordPress AI para aproveitar OpenAI, Gemini, Claude ou conectores oficiais de IA do WordPress. O OpenRouter direto permanece disponível como fallback ou opção dedicada."
+msgstr "Use WordPress AI to leverage OpenAI, Gemini, Claude, or official WordPress AI connectors. Direct OpenRouter remains available as fallback or dedicated option."
+
+msgid "Use antes de editar quando o usuario nao informar o ID do post."
+msgstr "Use before editing when user doesn't provide post ID."
+
+msgid "Use apenas letras, números e hifens. Ele define o shortcode e separa a memória e o treinamento no banco de dados."
+msgstr "Use only letters, numbers, and hyphens. It defines the shortcode and separates memory and training in DB."
+
+msgid "Use este campo para colar uma versao limpa em TXT/Markdown de PDFs grandes quando a hospedagem nao tiver extrator confiavel. Ao salvar, o texto sera dividido em trechos pesquisaveis."
+msgstr "Use this field to paste a clean TXT/Markdown version of large PDFs when hosting lacks reliable extractor. Upon saving, text is split into searchable snippets."
+
+msgid "Use para criar apenas rascunhos revisaveis. Nunca afirme que publicou."
+msgstr "Use to create only reviewable drafts. Never claim to have published."
+
+msgid "Use para encontrar o ID do comentario antes de aprovar ou rejeitar."
+msgstr "Use to find comment ID before approving or rejecting."
+
+msgid "Use quando o usuario pedir apenas para alterar titulo de post ou pagina. Se o ID nao estiver claro, use wpagent/search-posts antes."
+msgstr "Use when user only asks to change post or page title. If ID isn't clear, use wpagent/search-posts first."
+
+msgid "Use somente apos identificar claramente qual post sera alterado. Peca confirmacao quando faltar ID ou titulo."
+msgstr "Use only after clearly identifying which post to change. Ask for confirmation when ID or title is missing."
+
+msgid "Use somente quando o ID do comentario e a acao estiverem claros. Para rejeitar, use action=reject."
+msgstr "Use only when comment ID and action are clear. To reject, use action=reject."
+
+msgid "Uso de Tokens"
+msgstr "Token Usage"
+
+msgid "Uso de Tokens do WPAgents"
+msgstr "WPAgents Token Usage"
+
+msgid "Usuario"
+msgstr "User"
+
+msgid "Usuario #%d"
+msgstr "User #%d"
+
+msgid "Usuarios"
+msgstr "Users"
+
+msgid "Usuarios ativos:"
+msgstr "Active users:"
+
+msgid "Utilizado apenas quando este agente estiver configurado em OpenRouter direto ou como fallback da conexão."
+msgstr "Used only when this agent is configured in direct OpenRouter or as connection fallback."
+
+msgid "Valor usado apenas pelo modo OpenRouter direto do WPAgent ou como fallback quando o WordPress AI falhar e houver uma chave OpenRouter salva."
+msgstr "Value used only by WPAgent's direct OpenRouter mode or as fallback when WordPress AI fails and an OpenRouter key is saved."
+
+msgid "Ver"
+msgstr "View"
+
+msgid "Ver Atendimentos →"
+msgstr "View Customer Service →"
+
+msgid "Ver agentes"
+msgstr "View agents"
+
+msgid "Ver comentarios"
+msgstr "View comments"
+
+msgid "Verificar Consumo →"
+msgstr "Verify Consumption →"
+
+msgid "Visao geral, acessos rapidos aos modulos de IA e suporte oficial."
+msgstr "Overview, quick access to AI modules and official support."
+
+msgid "Visitante"
+msgstr "Visitor"
+
+msgid "Visitante: %s"
+msgstr "Visitor: %s"
+
+msgid "Visitantes anônimos"
+msgstr "Anonymous visitors"
+
+msgid "Visualizar Métricas →"
+msgstr "View Metrics →"
+
+msgid "Voce foi descadastrado e nao recebera mais esses e-mails. Pode fechar esta janela."
+msgstr "You have been unsubscribed and will no longer receive these emails. You can close this window."
+
+msgid "Voce gera o corpo de um e-mail recorrente para o destinatario. Escreva apenas o corpo pronto para envio, em texto plano, sem codigos de saida, sem markdown e sem mencionar que e automatico."
+msgstr "You generate the body of a recurring email for the recipient. Write only the body ready for sending, in plain text, without output codes, without markdown, and without mentioning it's automatic."
+
+msgid "Voce nao tem permissao para alterar o titulo deste conteudo."
+msgstr "You don't have permission to change the title of this content."
+
+msgid "Voce nao tem permissao para buscar usuarios."
+msgstr "You don't have permission to search users."
+
+msgid "Voce nao tem permissao para criar categorias."
+msgstr "You don't have permission to create categories."
+
+msgid "Voce nao tem permissao para criar este tipo de conteudo."
+msgstr "You don't have permission to create this type of content."
+
+msgid "Voce nao tem permissao para editar este post."
+msgstr "You don't have permission to edit this post."
+
+msgid "Voce nao tem permissao para listar menus."
+msgstr "You don't have permission to list menus."
+
+msgid "Voce nao tem permissao para listar midia."
+msgstr "You don't have permission to list media."
+
+msgid "Voce nao tem permissao para listar plugins."
+msgstr "You don't have permission to list plugins."
+
+msgid "Voce nao tem permissao para listar temas."
+msgstr "You don't have permission to list themes."
+
+msgid "Voce nao tem permissao para listar usuarios."
+msgstr "You don't have permission to list users."
+
+msgid "Voce nao tem permissao para moderar este comentario."
+msgstr "You don't have permission to moderate this comment."
+
+msgid "Voce nao tem permissao para publicar este post."
+msgstr "You don't have permission to publish this post."
+
+msgid "Voce nao tem permissao para ver informacoes do site."
+msgstr "You don't have permission to view site information."
+
+msgid "Voce recebeu este e-mail porque se inscreveu na conversa com o WPAgent. Para parar de receber, acesse: %s"
+msgstr "You received this email because you subscribed in the chat with WPAgent. To unsubscribe, visit: %s"
+
+msgid "Você atingiu o limite mensal de tokens. Tente novamente em 30 dias ou fale com o administrador."
+msgstr "You have reached the monthly token limit. Try again in 30 days or contact the administrator."
+
+msgid "Voltar"
+msgstr "Back"
+
+msgid "WPAgent - Uso de Tokens"
+msgstr "WPAgent - Token Usage"
+
+msgid "WPAgents"
+msgstr "WPAgents"
+
+msgid "WordPress AI / Connectors"
+msgstr "WordPress AI / Connectors"
+
+msgid "WordPress AI / Connectors (recomendado)"
+msgstr "WordPress AI / Connectors (recommended)"
+
+msgid "WordPress AI Client ainda nao foi detectado. Instale/ative o plugin AI oficial ou use o OpenRouter direto abaixo."
+msgstr "WordPress AI Client not detected yet. Install/activate official AI plugin or use direct OpenRouter below."
+
+msgid "WordPress AI Client detectado."
+msgstr "WordPress AI Client detected."
+
+msgid "ZipArchive nao esta disponivel para extrair arquivos DOCX."
+msgstr "ZipArchive is not available to extract DOCX files."
+
+msgid "agendado"
+msgstr "scheduled"
+
+msgid "automático"
+msgstr "automatic"
+
+msgid "diario"
+msgstr "daily"
+
+msgid "enviado"
+msgstr "sent"
+
+msgid "falhou"
+msgstr "failed"
+
+msgid "ilimitado"
+msgstr "unlimited"
+
+msgid "mensal"
+msgstr "monthly"
+
+msgid "pendente"
+msgstr "pending"
+
+msgid "semanal"
+msgstr "weekly"
+
+msgid "⏳ Em Progresso"
+msgstr "⏳ In Progress"
+
+msgid "✅ Receberam (Concluído)"
+msgstr "✅ Received (Completed)"
+
+msgid "👥 Total Cadastrados"
+msgstr "👥 Total Registered"
+
+msgid "🛑 Descadastrados"
+msgstr "🛑 Unsubscribed"
+

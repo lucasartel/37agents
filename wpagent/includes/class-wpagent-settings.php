@@ -10,28 +10,123 @@ class WPAgent_Settings {
 
 	public function register() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
+		add_action( 'admin_menu', array( $this, 'reorder_admin_menu' ), 999 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_filter( 'parent_file', array( $this, 'fix_parent_menu_link' ), 999 );
 	}
 
 	public function add_menu() {
+		$dashboard_callback = class_exists( 'WPAgent_Dashboard' ) ? array( new WPAgent_Dashboard(), 'render_page' ) : array( $this, 'render_page' );
+
+		$icon_svg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSJibGFjayI+PHBhdGggZD0iTTEwIDJsMS45IDUuN0wxOCA5LjZsLTYuMSAxLjlMMTAgMTcuMiA4LjEgMTEuNSAyIDkuNmw2LjEtMS45TDEwIDJ6bTEwIDEwbC45IDIuOEwyNCAxNS44bC0zLjEuOUwyMCAxOS41bC0uOS0yLjgtMy4xLS45IDMuMS0uOUwyMCAxMnptLTMgN2wuNiAxLjggMS45LjYtMS45LjYtLjYgMS44LS42LTEuOC0xLjktLjYgMS45LS42LjYtMS44eiIvPjwvc3ZnPg==';
+
 		add_menu_page(
-			__( 'WPAgent Settings', 'wpagent' ),
-			__( 'WPAgent', 'wpagent' ),
+			__( 'WPAgents', 'wpagent' ),
+			__( 'WPAgents', 'wpagent' ),
 			'manage_options',
 			'wpagent',
-			array( $this, 'render_page' ),
-			'dashicons-format-chat',
+			$dashboard_callback,
+			$icon_svg,
 			58
 		);
 
 		add_submenu_page(
 			'wpagent',
-			__( 'Settings', 'wpagent' ),
-			__( 'Settings', 'wpagent' ),
+			__( 'Dashboard', 'wpagent' ),
+			__( 'Dashboard', 'wpagent' ),
 			'manage_options',
 			'wpagent',
+			$dashboard_callback
+		);
+
+		add_submenu_page(
+			'wpagent',
+			__( 'Configurações', 'wpagent' ),
+			__( 'Configurações', 'wpagent' ),
+			'manage_options',
+			'wpagent-settings',
 			array( $this, 'render_page' )
 		);
+	}
+
+	public function reorder_admin_menu() {
+		global $submenu;
+		if ( ! isset( $submenu['wpagent'] ) || ! is_array( $submenu['wpagent'] ) ) {
+			return;
+		}
+
+		$desired_order = array(
+			'wpagent',                          // Dashboard
+			'edit.php?post_type=wpagent_agent', // Agentes
+			'wpagent-conversation-summaries',   // Atendimentos
+			'wpagent-comment-moderation',       // Moderação de Comentários (v0.6.1)
+			// 'wpagent-email-schedules',          // Agendamentos (desativado na v0.5.9)
+			'wpagent-periodic-tasks',           // Conteúdo Periódico
+			'wpagent-reports',                  // Relatórios
+			'wpagent-token-usage',              // Uso de Tokens
+			'wpagent-settings',                 // Configurações
+		);
+
+		$current = $submenu['wpagent'];
+		$ordered = array();
+
+		foreach ( $desired_order as $slug ) {
+			foreach ( $current as $key => $item ) {
+				if ( isset( $item[2] ) && $item[2] === $slug ) {
+					$ordered[] = $item;
+					unset( $current[ $key ] );
+					break;
+				}
+			}
+		}
+
+		foreach ( $current as $item ) {
+			$ordered[] = $item;
+		}
+
+		$submenu['wpagent'] = array_values( $ordered );
+
+		// Garante que a primeira opção seja sempre o Dashboard ('wpagent') para o menu raiz apontar para o Dashboard e não Agentes
+		if ( isset( $submenu['wpagent'][0] ) && $submenu['wpagent'][0][2] !== 'wpagent' ) {
+			foreach ( $submenu['wpagent'] as $k => $subitem ) {
+				if ( isset( $subitem[2] ) && 'wpagent' === $subitem[2] ) {
+					$dashboard_item = $submenu['wpagent'][ $k ];
+					unset( $submenu['wpagent'][ $k ] );
+					array_unshift( $submenu['wpagent'], $dashboard_item );
+					$submenu['wpagent'] = array_values( $submenu['wpagent'] );
+					break;
+				}
+			}
+		}
+
+		global $menu;
+		if ( ! empty( $menu ) && is_array( $menu ) ) {
+			foreach ( $menu as $idx => $m_item ) {
+				if ( isset( $m_item[2] ) && 'wpagent' === $m_item[2] ) {
+					$menu[ $idx ][2] = 'wpagent';
+					break;
+				}
+			}
+		}
+	}
+
+	public function fix_parent_menu_link( $parent_file ) {
+		global $submenu;
+		if ( isset( $submenu['wpagent'] ) && is_array( $submenu['wpagent'] ) ) {
+			$submenu['wpagent'] = array_values( $submenu['wpagent'] );
+			if ( isset( $submenu['wpagent'][0] ) && $submenu['wpagent'][0][2] !== 'wpagent' ) {
+				foreach ( $submenu['wpagent'] as $k => $item ) {
+					if ( isset( $item[2] ) && 'wpagent' === $item[2] ) {
+						$dashboard = $submenu['wpagent'][ $k ];
+						unset( $submenu['wpagent'][ $k ] );
+						array_unshift( $submenu['wpagent'], $dashboard );
+						$submenu['wpagent'] = array_values( $submenu['wpagent'] );
+						break;
+					}
+				}
+			}
+		}
+		return $parent_file;
 	}
 
 	public function register_settings() {
@@ -62,13 +157,11 @@ class WPAgent_Settings {
 			'max_knowledge_items'     => max( 0, absint( $input['max_knowledge_items'] ?? 4 ) ),
 			'max_memory_items'        => max( 0, absint( $input['max_memory_items'] ?? 8 ) ),
 			'max_recent_interactions' => max( 0, absint( $input['max_recent_interactions'] ?? 4 ) ),
+			'ai_request_timeout'      => max( 5, min( 300, absint( $input['ai_request_timeout'] ?? 30 ) ) ),
 			'embedding_enabled'       => empty( $input['embedding_enabled'] ) ? '0' : '1',
 			'embedding_provider'      => sanitize_key( $input['embedding_provider'] ?? $current['embedding_provider'] ?? 'openrouter' ),
 			'embedding_model'         => sanitize_text_field( $input['embedding_model'] ?? $current['embedding_model'] ?? 'openai/text-embedding-3-small' ),
 			'embedding_batch_size'    => max( 1, min( 50, absint( $input['embedding_batch_size'] ?? 10 ) ) ),
-			'periodic_tasks_enabled'  => empty( $input['periodic_tasks_enabled'] ) ? '0' : '1',
-			'periodic_task_mode'      => in_array( $input['periodic_task_mode'] ?? '', array( 'report_only', 'drafts' ), true ) ? sanitize_key( $input['periodic_task_mode'] ) : ( $current['periodic_task_mode'] ?? 'report_only' ),
-			'periodic_tasks'          => $this->sanitize_periodic_tasks( $input['periodic_tasks'] ?? $current['periodic_tasks'] ?? array() ),
 			'system_prompt'           => wp_kses_post( $input['system_prompt'] ?? $current['system_prompt'] ?? '' ),
 			'enable_global_token_limit' => empty( $input['enable_global_token_limit'] ) ? '0' : '1',
 			'global_token_limit'      => max( 0, absint( $input['global_token_limit'] ?? 100000 ) ),
@@ -94,9 +187,6 @@ class WPAgent_Settings {
 			'embedding_provider'      => 'openrouter',
 			'embedding_model'         => 'openai/text-embedding-3-small',
 			'embedding_batch_size'    => 10,
-			'periodic_tasks_enabled'  => '0',
-			'periodic_task_mode'      => 'report_only',
-			'periodic_tasks'          => $this->default_periodic_tasks(),
 			'system_prompt'           => 'Voce e um assistente pessoal cuidadoso, util e contextual.',
 			'enable_global_token_limit' => '0',
 			'global_token_limit'      => 100000,
@@ -113,78 +203,62 @@ class WPAgent_Settings {
 		return array_key_exists( $key, $options ) ? $options[ $key ] : $default;
 	}
 
-	private function default_periodic_tasks() {
-		$tasks = array();
-
-		if ( class_exists( 'WPAgent_Periodic_Tasks' ) ) {
-			foreach ( WPAgent_Periodic_Tasks::task_catalog() as $task_id => $definition ) {
-				$tasks[ $task_id ] = array(
-					'enabled'   => '0',
-					'frequency' => 'daily',
-					'prompt'    => $definition['default_prompt'] ?? '',
-				);
-			}
-		}
-
-		return $tasks;
-	}
-
-	private function sanitize_periodic_tasks( $input ) {
-		$output = array();
-		$catalog = class_exists( 'WPAgent_Periodic_Tasks' ) ? WPAgent_Periodic_Tasks::task_catalog() : array();
-		$frequencies = class_exists( 'WPAgent_Periodic_Tasks' ) ? array_keys( WPAgent_Periodic_Tasks::frequency_options() ) : array( 'daily' );
-
-		foreach ( $catalog as $task_id => $definition ) {
-			$task = is_array( $input[ $task_id ] ?? null ) ? $input[ $task_id ] : array();
-			$frequency = sanitize_key( $task['frequency'] ?? 'daily' );
-
-			$output[ $task_id ] = array(
-				'enabled'   => empty( $task['enabled'] ) ? '0' : '1',
-				'frequency' => in_array( $frequency, $frequencies, true ) ? $frequency : 'daily',
-				'prompt'    => sanitize_textarea_field( $task['prompt'] ?? $definition['default_prompt'] ?? '' ),
-			);
-		}
-
-		return $output;
-	}
-
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
 		$options = $this->all();
-		$tab = sanitize_key( wp_unslash( $_GET['tab'] ?? 'general' ) );
+		WPAgent_Admin_UI::render_header(
+			__( 'Configurações do WPAgents', 'wpagent' ),
+			__( 'Configure a conexão global com Inteligência Artificial e crie agentes independentes.', 'wpagent' )
+		);
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'WPAgent', 'wpagent' ); ?></h1>
-			<p><?php esc_html_e( 'Configure a conexao global com IA e crie agentes independentes, cada um com shortcode e treinamento proprio.', 'wpagent' ); ?></p>
+		<div class="wpagents-form-wrap">
+			<div class="notice notice-info" style="margin:0 0 16px;padding:12px 16px;border-left-color:#1a73e8;">
+				<p><strong><?php esc_html_e( 'Serviços Externos e Privacidade', 'wpagent' ); ?></strong></p>
+				<p>
+				<?php
+				echo wp_kses(
+					__( 'Este plugin envia as mensagens digitadas pelos usuários aos serviços de IA configurados (<strong>OpenRouter</strong> e/ou <strong>WordPress AI Connectors</strong>) para gerar respostas. Ao instalar e configurar este plugin, você consente com esse envio de dados. Nenhuma mensagem é transmitida antes de a chave de API ou connector ser configurado pelo administrador.', 'wpagent' ),
+					array( 'strong' => array() )
+				);
+				?>
+				</p>
+				<p class="description">
+					<?php
+					echo wp_kses(
+						sprintf(
+							/* translators: 1: OpenRouter privacy URL, 2: WordPress AI privacy URL */
+							__( 'Políticas de privacidade: <a href="%1$s" target="_blank" rel="noopener noreferrer">OpenRouter</a> | <a href="%2$s" target="_blank" rel="noopener noreferrer">WordPress AI</a>.', 'wpagent' ),
+							'https://openrouter.ai/privacy',
+							'https://wordpress.org/about/privacy/'
+						),
+						array( 'a' => array( 'href' => array(), 'target' => array(), 'rel' => array() ) )
+					);
+					?>
+				</p>
+			</div>
 			<p>
 				<a class="button button-primary" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=wpagent_agent' ) ); ?>"><?php esc_html_e( 'Criar novo agente', 'wpagent' ); ?></a>
 				<a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=wpagent_agent' ) ); ?>"><?php esc_html_e( 'Ver agentes', 'wpagent' ); ?></a>
 				<a class="button" href="<?php echo esc_url( admin_url( 'options-general.php?page=ai-wp-admin' ) ); ?>"><?php esc_html_e( 'Plugin AI do WordPress', 'wpagent' ); ?></a>
 				<a class="button" href="<?php echo esc_url( admin_url( 'options-connectors.php' ) ); ?>"><?php esc_html_e( 'Connectors', 'wpagent' ); ?></a>
 			</p>
-			<h2 class="nav-tab-wrapper">
-				<a class="nav-tab <?php echo 'general' === $tab ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent' ) ); ?>"><?php esc_html_e( 'Settings', 'wpagent' ); ?></a>
-				<a class="nav-tab <?php echo 'periodic-tasks' === $tab ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent&tab=periodic-tasks' ) ); ?>"><?php esc_html_e( 'Periodic Tasks', 'wpagent' ); ?></a>
-			</h2>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'wpagent_settings' ); ?>
-				<?php if ( 'periodic-tasks' === $tab ) : ?>
-					<?php $this->render_periodic_tasks_settings( $options ); ?>
-				<?php else : ?>
-					<?php $this->render_general_settings( $options ); ?>
-				<?php endif; ?>
+				<?php $this->render_general_settings( $options ); ?>
 				<?php submit_button(); ?>
 			</form>
-			<?php if ( 'general' === $tab ) : ?>
-				<h2><?php esc_html_e( 'Como usar', 'wpagent' ); ?></h2>
-				<p><?php esc_html_e( 'Cada agente exibe seu shortcode na tela de edicao e recebe seus arquivos de treinamento na propria configuracao.', 'wpagent' ); ?></p>
-				<p><code>[wpagent_chat agent="educadoria"]</code></p>
-			<?php endif; ?>
+		</div>
+
+		<div class="wpagents-form-wrap" style="margin-top: 24px;">
+			<h2><?php esc_html_e( 'Como usar', 'wpagent' ); ?></h2>
+			<p><?php esc_html_e( 'Cada agente exibe seu shortcode na tela de edicao e recebe seus arquivos de treinamento na propria configuracao.', 'wpagent' ); ?></p>
+			<p><code>[wpagent_chat agent="educadoria"]</code></p>
 		</div>
 		<?php
+		WPAgent_Admin_UI::render_footer();
 	}
 
 	private function render_general_settings( $options ) {
@@ -241,6 +315,13 @@ class WPAgent_Settings {
 						<td>
 							<input id="wpagent-api-key" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[openrouter_api_key]" value="" placeholder="<?php echo empty( $options['openrouter_api_key'] ) ? '' : esc_attr__( 'Chave salva. Preencha apenas para trocar.', 'wpagent' ); ?>">
 							<p class="description"><?php esc_html_e( 'Preencha somente se quiser usar OpenRouter direto pelo WPAgent ou manter um fallback proprio. Se houver um conector OpenRouter no WordPress AI, o WPAgent tambem tenta espelhar esta chave para ele.', 'wpagent' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="wpagent-ai-timeout"><?php esc_html_e( 'Timeout das requisições à IA (segundos)', 'wpagent' ); ?></label></th>
+						<td>
+							<input id="wpagent-ai-timeout" type="number" min="5" max="300" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[ai_request_timeout]" value="<?php echo absint( $options['ai_request_timeout'] ?? 30 ); ?>" class="small-text">
+							<p class="description"><?php esc_html_e( 'Tempo máximo de espera por resposta da IA. Aumente se usar modelos mais lentos. Padrão: 30 segundos.', 'wpagent' ); ?></p>
 						</td>
 					</tr>
 					<tr>
@@ -339,111 +420,6 @@ class WPAgent_Settings {
 		</datalist>
 		<?php
 	}
+}
+}
 
-	private function render_periodic_tasks_settings( $options ) {
-		$catalog = WPAgent_Periodic_Tasks::task_catalog();
-		$frequencies = WPAgent_Periodic_Tasks::frequency_options();
-		$state = get_option( WPAgent_Periodic_Tasks::STATE_OPTION, array() );
-		$state = is_array( $state ) ? $state : array();
-		$tasks = is_array( $options['periodic_tasks'] ?? null ) ? $options['periodic_tasks'] : array();
-		$next_run = wp_next_scheduled( WPAgent_Periodic_Tasks::CRON_HOOK );
-		?>
-		<table class="form-table" role="presentation">
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Tarefas periodicas', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[periodic_tasks_enabled]" value="1" <?php checked( $options['periodic_tasks_enabled'] ?? '0', '1' ); ?>> <?php esc_html_e( 'Ativar cuidador periodico do site.', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'As tarefas usam WP-Cron. Em hospedagens comuns, elas rodam quando o site recebe visitas ou quando ha cron real configurado no servidor.', 'wpagent' ); ?></p>
-					<?php if ( $next_run ) : ?>
-						<p class="description">
-							<?php
-							printf(
-								/* translators: %s: next cron date. */
-								esc_html__( 'Proxima verificacao automatica: %s.', 'wpagent' ),
-								esc_html( wp_date( 'Y-m-d H:i:s', $next_run ) )
-							);
-							?>
-						</p>
-					<?php endif; ?>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Modo de execucao', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="radio" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[periodic_task_mode]" value="report_only" <?php checked( $options['periodic_task_mode'] ?? 'report_only', 'report_only' ); ?>> <?php esc_html_e( 'Apenas relatorios e recomendacoes', 'wpagent' ); ?></label><br>
-					<label><input type="radio" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[periodic_task_mode]" value="drafts" <?php checked( $options['periodic_task_mode'] ?? 'report_only', 'drafts' ); ?>> <?php esc_html_e( 'Permitir criacao de rascunhos revisaveis', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'Atualizacao de plugins, publicacao de posts e moderacao de comentarios continuam exigindo acao humana nesta versao.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-		</table>
-		<h2><?php esc_html_e( 'Funcoes habilitadas', 'wpagent' ); ?></h2>
-		<table class="widefat striped">
-			<thead>
-				<tr>
-					<th><?php esc_html_e( 'Ativar', 'wpagent' ); ?></th>
-					<th><?php esc_html_e( 'Funcao', 'wpagent' ); ?></th>
-					<th><?php esc_html_e( 'Periodicidade', 'wpagent' ); ?></th>
-					<th><?php esc_html_e( 'Instrucao', 'wpagent' ); ?></th>
-					<th><?php esc_html_e( 'Ultimo resultado', 'wpagent' ); ?></th>
-					<th><?php esc_html_e( 'Executar', 'wpagent' ); ?></th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ( $catalog as $task_id => $definition ) : ?>
-					<?php
-					$task = wp_parse_args(
-						$tasks[ $task_id ] ?? array(),
-						array(
-							'enabled'   => '0',
-							'frequency' => 'daily',
-							'prompt'    => $definition['default_prompt'] ?? '',
-						)
-					);
-					$task_state = $state[ $task_id ] ?? array();
-					?>
-					<tr>
-						<td><input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[periodic_tasks][<?php echo esc_attr( $task_id ); ?>][enabled]" value="1" <?php checked( $task['enabled'], '1' ); ?>></td>
-						<td>
-							<strong><?php echo esc_html( $definition['label'] ); ?></strong>
-							<p class="description"><?php echo esc_html( $definition['description'] ); ?></p>
-						</td>
-						<td>
-							<select name="<?php echo esc_attr( self::OPTION_NAME ); ?>[periodic_tasks][<?php echo esc_attr( $task_id ); ?>][frequency]">
-								<?php foreach ( $frequencies as $frequency => $label ) : ?>
-									<option value="<?php echo esc_attr( $frequency ); ?>" <?php selected( $task['frequency'], $frequency ); ?>><?php echo esc_html( $label ); ?></option>
-								<?php endforeach; ?>
-							</select>
-						</td>
-						<td>
-							<textarea class="large-text" rows="4" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[periodic_tasks][<?php echo esc_attr( $task_id ); ?>][prompt]"><?php echo esc_textarea( $task['prompt'] ); ?></textarea>
-						</td>
-						<td>
-							<?php if ( ! empty( $task_state ) ) : ?>
-								<strong><?php echo esc_html( $task_state['message'] ?? '' ); ?></strong>
-								<?php if ( ! empty( $task_state['last_run'] ) ) : ?>
-									<p class="description"><?php echo esc_html( $task_state['last_run'] ); ?></p>
-								<?php endif; ?>
-								<?php if ( ! empty( $task_state['post_id'] ) ) : ?>
-									<p><a href="<?php echo esc_url( get_edit_post_link( absint( $task_state['post_id'] ) ) ); ?>"><?php esc_html_e( 'Abrir rascunho', 'wpagent' ); ?></a></p>
-								<?php endif; ?>
-								<?php if ( ! empty( $task_state['result'] ) ) : ?>
-									<details>
-										<summary><?php esc_html_e( 'Ver detalhes', 'wpagent' ); ?></summary>
-										<p><?php echo nl2br( esc_html( wp_trim_words( $task_state['result'], 120 ) ) ); ?></p>
-									</details>
-								<?php endif; ?>
-							<?php else : ?>
-								<span class="description"><?php esc_html_e( 'Ainda nao executada.', 'wpagent' ); ?></span>
-							<?php endif; ?>
-						</td>
-						<td>
-							<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=wpagent_run_periodic_task_now&task=' . $task_id ), 'wpagent_run_periodic_task_now' ) ); ?>"><?php esc_html_e( 'Executar agora', 'wpagent' ); ?></a>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
-		<?php
-	}
-}
-}

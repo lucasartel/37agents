@@ -47,13 +47,29 @@ class WPAgent_Activator {
 			conversation_id varchar(120) NOT NULL DEFAULT '',
 			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
 			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			project_id bigint(20) unsigned NULL DEFAULT NULL,
 			title varchar(190) NOT NULL DEFAULT '',
 			status varchar(20) NOT NULL DEFAULT 'active',
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
 			UNIQUE KEY conversation_id (conversation_id),
-			KEY user_agent_updated (user_id, agent_slug, updated_at)
+			KEY user_agent_updated (user_id, agent_slug, updated_at),
+			KEY user_agent_project (user_id, agent_slug, project_id, updated_at)
+		) {$charset_collate};";
+
+		$projects = $wpdb->prefix . 'wpagent_projects';
+		$sql[] = "CREATE TABLE {$projects} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			name varchar(190) NOT NULL DEFAULT '',
+			profile_data longtext NULL,
+			is_default tinyint(1) NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY user_agent (user_id, agent_slug)
 		) {$charset_collate};";
 
 		$sql[] = "CREATE TABLE {$memories} (
@@ -203,7 +219,7 @@ class WPAgent_Activator {
 			next_send_at datetime NULL,
 			occurrences_sent int unsigned NOT NULL DEFAULT 0,
 			last_sent_at datetime NULL,
-			status varchar(40) NOT NULL DEFAULT 'subscribed',
+			status varchar(40) NOT NULL DEFAULT 'active',
 			unsubscribe_token varchar(64) NOT NULL DEFAULT '',
 			unsubscribed_at datetime NULL,
 			metadata longtext NULL,
@@ -249,6 +265,25 @@ class WPAgent_Activator {
 			PRIMARY KEY  (id),
 			UNIQUE KEY conversation_agent (conversation_id, agent_slug),
 			KEY agent_user (agent_slug, user_id)
+		) {$charset_collate};";
+
+		$periodic_contents = $wpdb->prefix . 'wpagent_periodic_contents';
+		$sql[] = "CREATE TABLE {$periodic_contents} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			name varchar(255) NOT NULL DEFAULT '',
+			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			prompt longtext NOT NULL,
+			frequency varchar(40) NOT NULL DEFAULT 'daily',
+			post_category bigint(20) unsigned NOT NULL DEFAULT 1,
+			status varchar(40) NOT NULL DEFAULT 'active',
+			last_run_at datetime NULL,
+			next_run_at datetime NULL,
+			last_post_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY agent_status (agent_slug, status),
+			KEY next_run (status, next_run_at)
 		) {$charset_collate};";
 
 		foreach ( $sql as $statement ) {

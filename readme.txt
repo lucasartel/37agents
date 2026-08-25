@@ -1,10 +1,10 @@
-=== WPAgent ===
+=== WPAgents ===
 Contributors: wpagent
 Tags: ai, chatbot, agents, rag, openrouter
 Requires at least: 7.0
 Tested up to: 7.0.1
 Requires PHP: 7.4
-Stable tag: 0.5.7
+Stable tag: 0.5.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Create AI agents for WordPress with per-agent prompts, training documents, user 
 
 == Description ==
 
-WPAgent lets WordPress site owners create personalized AI agents that can answer through a front-end shortcode, use uploaded training documents as context, remember user-specific information, and work with WordPress AI / Connectors or OpenRouter.
+WPAgents lets WordPress site owners create personalized AI agents that can answer through a front-end shortcode, use uploaded training documents as context, remember user-specific information, and work with WordPress AI / Connectors or OpenRouter.
 
 The plugin is designed for projects that need more than a single API-key chatbot. Each agent has its own slug, prompt, provider settings, training sources, context limits, guest access rules, and optional features such as user profiles, email proposals, embeddings, and admin-only assistants.
 

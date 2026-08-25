@@ -65,7 +65,25 @@ class WPAgent_Conversation_Summaries {
 		}
 		$summaries = $this->repository->list_conversation_summaries( $args );
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'Atendimentos', 'wpagent' ) . '</h1>';
+		WPAgent_Admin_UI::render_header(
+			__( 'Atendimentos do WPAgents', 'wpagent' ),
+			__( 'Histórico completo, resumos e insights das interações com seus visitantes.', 'wpagent' )
+		);
+
+		if ( isset( $_GET['wpagent_notice'] ) ) {
+			$notice = sanitize_key( wp_unslash( $_GET['wpagent_notice'] ) );
+			if ( 'summary_generated' === $notice ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Resumo da conversa gerado com sucesso.', 'wpagent' ) . '</p></div>';
+			} elseif ( 'summaries_processed' === $notice ) {
+				$count = absint( $_GET['processed'] ?? 0 );
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( sprintf( __( 'Processamento concluído: %d resumo(s) gerado(s).', 'wpagent' ), $count ) ) . '</p></div>';
+			}
+		}
+		if ( isset( $_GET['wpagent_error'] ) ) {
+			$error = sanitize_text_field( rawurldecode( wp_unslash( $_GET['wpagent_error'] ) ) );
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error ) . '</p></div>';
+		}
+
 		echo '<p class="description">' . esc_html__( 'Resumos automaticos das conversas de cada agente, gerados apos periodo de inatividade, para consulta e follow-up humano.', 'wpagent' ) . '</p>';
 
 		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" style="margin-bottom:16px">';
@@ -119,7 +137,7 @@ class WPAgent_Conversation_Summaries {
 
 		if ( empty( $summaries ) ) {
 			echo '<p>' . esc_html__( 'Nenhum resumo gerado ainda. Os resumos sao produzidos automaticamente quando o agente tem a opcao ativada e a conversa fica inativa por 4 horas.', 'wpagent' ) . '</p>';
-			echo '</div>';
+			WPAgent_Admin_UI::render_footer();
 			return;
 		}
 
@@ -173,7 +191,8 @@ class WPAgent_Conversation_Summaries {
 			echo '</tr>';
 		}
 
-		echo '</tbody></table></div>';
+		echo '</tbody></table>';
+		WPAgent_Admin_UI::render_footer();
 	}
 
 	private function data_point_label( $key ) {
@@ -238,26 +257,30 @@ class WPAgent_Conversation_Summaries {
 			}
 
 			foreach ( $conversations as $conv ) {
-				$this->generate_summary_for_conversation( $conv, $agent );
-				$processed++;
+				$res = $this->generate_summary_for_conversation( $conv, $agent );
+				if ( $res && ! is_wp_error( $res ) ) {
+					$processed++;
+				}
 				if ( $processed >= $per_run ) {
 					break;
 				}
 			}
 		}
+
+		return $processed;
 	}
 
-public function generate_summary_for_conversation( $conversation, $agent ) {
-		$user_id          = absint( $conversation['user_id'] );
-		$conversation_id  = sanitize_text_field( $conversation['conversation_id'] );
-		$agent_slug       = sanitize_key( $conversation['agent_slug'] );
+	public function generate_summary_for_conversation( $conversation, $agent ) {
+		$user_id          = absint( $conversation['user_id'] ?? 0 );
+		$conversation_id  = sanitize_text_field( $conversation['conversation_id'] ?? '' );
+		$agent_slug       = sanitize_key( $conversation['agent_slug'] ?? 'default' );
 
-		$recent = $this->repository->get_conversation_interactions( $conversation_id, $agent_slug, 50 );
+		$recent = $this->repository->get_conversation_interactions( $conversation_id, $agent_slug, 100 );
 		if ( empty( $recent ) || count( $recent ) < 2 ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				error_log( 'WPAgent Summary: conversation ' . $conversation_id . ' has only ' . count( $recent ) . ' interactions, skipping.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}
-			return false;
+			return new WP_Error( 'wpagent_summary_insufficient_interactions', __( 'A conversa precisa ter no mínimo 2 interações para gerar um resumo.', 'wpagent' ) );
 		}
 
 		$transcript = '';
@@ -283,22 +306,33 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				error_log( 'WPAgent Summary: AI error for conversation ' . $conversation_id . ': ' . $result->get_error_message() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}
-			return false;
+			return $result;
 		}
 
-		$data_points = $this->parse_summary_json( $result );
+		$data_points   = $this->parse_summary_json( $result );
 		$plain_summary = $this->format_plain_summary( $data_points );
 
-		$this->repository->upsert_conversation_summary( array(
+		$last_item = end( $recent );
+		$last_interaction_id = absint( $last_item['id'] ?? $conversation['last_interaction_id'] ?? 0 );
+		$last_interaction_at = $last_item['created_at'] ?? $conversation['last_interaction_at'] ?? current_time( 'mysql' );
+
+		$provider_mode = $agent['provider_mode'] ?? 'wordpress_ai';
+		$model    = 'wordpress_ai' === $provider_mode ? ( $agent['wordpress_ai_model'] ?: 'default' ) : ( $agent['openrouter_model'] ?: 'openrouter' );
+		$provider = 'wordpress_ai' === $provider_mode ? ( $agent['wordpress_ai_provider'] ?: 'wordpress_ai' ) : 'openrouter';
+
+		return $this->repository->upsert_conversation_summary( array(
 			'agent_slug'          => $agent_slug,
 			'user_id'             => $user_id,
 			'conversation_id'     => $conversation_id,
 			'conversation_title'  => $conversation['title'] ?? '',
 			'summary'             => $plain_summary,
 			'data_points'         => $data_points,
-			'interaction_count'   => absint( $conversation['interaction_count'] ),
-			'last_interaction_id' => absint( $conversation['last_interaction_id'] ),
-			'last_interaction_at' => $conversation['last_interaction_at'] ?? '',
+			'interaction_count'   => count( $recent ),
+			'last_interaction_id' => $last_interaction_id,
+			'last_interaction_at' => $last_interaction_at,
+			'model'               => $model,
+			'provider'            => $provider,
+			'generated_at'        => current_time( 'mysql' ),
 		) );
 	}
 
@@ -350,24 +384,19 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 
 		$conversation_id = sanitize_text_field( wp_unslash( $_GET['conversation_id'] ?? '' ) );
 		$agent_slug      = sanitize_key( wp_unslash( $_GET['agent_slug'] ?? 'default' ) );
-		$agent = $this->agents->get_agent( $agent_slug );
+		$agent           = $this->agents->get_agent( $agent_slug );
 
-		$interactions = $this->repository->get_conversation_interactions( $conversation_id, $agent_slug, 100 );
+		$interactions       = $this->repository->get_conversation_interactions( $conversation_id, $agent_slug, 100 );
 		$interaction_count  = count( $interactions );
 		$last_interaction_id = $interaction_count > 0 ? absint( $interactions[ $interaction_count - 1 ]['id'] ?? 0 ) : 0;
 		$last_interaction_at = $interaction_count > 0 ? ( $interactions[ $interaction_count - 1 ]['created_at'] ?? '' ) : '';
-		$title = '';
+		$title   = '';
 		$user_id = 0;
 
-		if ( $interaction_count > 0 ) {
-			$conv = $this->repository->get_conversation( $conversation_id, 0, $agent_slug );
-			if ( ! $conv ) {
-				$conv = $this->repository->get_conversation( $conversation_id, get_current_user_id(), $agent_slug );
-			}
-			if ( $conv ) {
-				$title   = $conv['title'] ?? '';
-				$user_id = absint( $conv['user_id'] ?? 0 );
-			}
+		$conv = $this->repository->get_conversation_by_id( $conversation_id, $agent_slug );
+		if ( $conv ) {
+			$title   = $conv['title'] ?? '';
+			$user_id = absint( $conv['user_id'] ?? 0 );
 		}
 
 		$data = array(
@@ -380,9 +409,14 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 			'last_interaction_at' => $last_interaction_at,
 		);
 
-		$this->generate_summary_for_conversation( $data, $agent );
+		$res = $this->generate_summary_for_conversation( $data, $agent );
 
-		wp_safe_redirect( $this->admin_url( array( 'agent' => $agent_slug ) ) );
+		if ( is_wp_error( $res ) ) {
+			wp_safe_redirect( $this->admin_url( array( 'agent' => $agent_slug, 'wpagent_error' => rawurlencode( $res->get_error_message() ) ) ) );
+			exit;
+		}
+
+		wp_safe_redirect( $this->admin_url( array( 'agent' => $agent_slug, 'wpagent_notice' => 'summary_generated' ) ) );
 		exit;
 	}
 
@@ -392,9 +426,9 @@ public function generate_summary_for_conversation( $conversation, $agent ) {
 		}
 		check_admin_referer( 'wpagent_process_summaries_now' );
 
-		$this->process_due();
+		$processed = $this->process_due();
 
-		wp_safe_redirect( $this->admin_url() );
+		wp_safe_redirect( $this->admin_url( array( 'wpagent_notice' => 'summaries_processed', 'processed' => $processed ) ) );
 		exit;
 	}
 

@@ -29,6 +29,8 @@ class WPAgent_Agents {
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( $this, 'columns' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'column_content' ), 10, 2 );
 		add_action( 'admin_notices', array( $this, 'admin_notices' ) );
+		add_action( 'in_admin_header', array( $this, 'render_admin_header' ) );
+		add_action( 'in_admin_footer', array( $this, 'render_admin_footer' ) );
 	}
 
 	public function register_post_type() {
@@ -150,10 +152,121 @@ class WPAgent_Agents {
 		?>
 		<table class="form-table" role="presentation">
 			<tr>
-				<th scope="row"><label for="wpagent-agent-slug"><?php esc_html_e( 'Identificador', 'wpagent' ); ?></label></th>
+				<th scope="row"><label for="wpagent-agent-slug"><?php esc_html_e( 'Identificador (Slug)', 'wpagent' ); ?></label></th>
 				<td>
 					<input id="wpagent-agent-slug" class="regular-text" name="wpagent_agent[slug]" value="<?php echo esc_attr( $agent['slug'] ); ?>">
-					<p class="description"><?php esc_html_e( 'Use apenas letras, numeros e hifens. Ele define o shortcode e separa memoria/treinamento.', 'wpagent' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Use apenas letras, números e hifens. Ele define o shortcode e separa a memória e o treinamento no banco de dados.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Assistente público do site', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[public_site_assistant]" value="1" <?php checked( $agent['public_site_assistant'], '1' ); ?>> <?php esc_html_e( 'Exibir este agente automaticamente como widget/pop-up no front-end do site para visitantes.', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Ao ativar, o widget flutuante de atendimento do WPAgents ficará disponível em todas as páginas públicas do WordPress.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Assistente interno do admin', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[admin_assistant]" value="1" <?php checked( $agent['admin_assistant'], '1' ); ?>> <?php esc_html_e( 'Exibir este agente automaticamente como widget flutuante no painel administrativo do WordPress.', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Disponível em todas as telas de administração do WordPress como assistente gerencial e consultor de tarefas.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="wpagent-agent-system-prompt"><?php esc_html_e( 'Instrução base (System Prompt)', 'wpagent' ); ?></label></th>
+				<td>
+					<textarea id="wpagent-agent-system-prompt" class="large-text" rows="8" name="wpagent_agent[system_prompt]"><?php echo esc_textarea( $agent['system_prompt'] ); ?></textarea>
+					<p class="description"><?php esc_html_e( 'Define o papel, tom de voz, diretrizes e regras fixas de atendimento deste agente. Links externos aqui são tratados como texto; para indexar conteúdos complexos, utilize a aba de Treinamentos.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Visitantes anônimos', 'wpagent' ); ?></th>
+				<td><label><input type="checkbox" name="wpagent_agent[allow_guest_chat]" value="1" <?php checked( $agent['allow_guest_chat'], '1' ); ?>> <?php esc_html_e( 'Permitir chat sem login de usuário (visitantes não autenticados).', 'wpagent' ); ?></label></td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Papéis com acesso', 'wpagent' ); ?></th>
+				<td>
+					<?php
+					$allowed_roles = $agent['allowed_roles'] ?? array();
+					$all_roles = wp_roles()->get_names();
+					foreach ( $all_roles as $role_key => $role_name ) :
+					?>
+						<label style="display:block;margin-bottom:4px;">
+							<input type="checkbox" name="wpagent_agent[allowed_roles][]" value="<?php echo esc_attr( $role_key ); ?>" <?php checked( in_array( $role_key, $allowed_roles, true ) ); ?>>
+							<?php echo esc_html( translate_user_role( $role_name ) ); ?>
+						</label>
+					<?php endforeach; ?>
+					<p class="description"><?php esc_html_e( 'Papéis do WordPress que podem interagir com este agente. Deixe todos desmarcados para acesso irrestrito (recomendado para agentes públicos).', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Envio de arquivos no chat', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[enable_frontend_uploads]" value="1" <?php checked( $agent['enable_frontend_uploads'], '1' ); ?>> <?php esc_html_e( 'Permitir envio de documentos pelo visitante na janela do chat.', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Quando ativo, exibe um botão de anexo no chat para o usuário enviar documentos (PDF, TXT, DOCX, CSV, JSON) que passam a integrar a base de conhecimento do atendimento.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Contexto do site', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[site_context_enabled]" value="1" <?php checked( $agent['site_context_enabled'], '1' ); ?>> <?php esc_html_e( 'Injetar informações públicas do site no contexto do agente (homepage, páginas, posts recentes).', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Quando ativo, o agente consulta automaticamente os conteúdos publicados do site para responder dúvidas institucionais com precisão.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Abas de Projetos / Clientes', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[enable_projects]" value="1" <?php checked( $agent['enable_projects'], '1' ); ?>> <?php esc_html_e( 'Habilitar abas de projetos no topo do chat para este agente.', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Permite que o visitante crie múltiplas abas de atendimento no topo da janela do chat, cada uma gerenciando um projeto ou assunto independente com histórico próprio.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Envio de e-mails', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[email_actions_enabled]" value="1" <?php checked( $agent['email_actions_enabled'], '1' ); ?>> <?php esc_html_e( 'Permitir que este agente prepare e envie e-mails individuais após confirmação do usuário no chat.', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'O agente solicita o e-mail do destinatário e gera uma mensagem individual no atendimento. O envio ocorre após confirmação no chat pelo visitante.', 'wpagent' ); ?></p>
+					<p style="margin-top: 10px;">
+						<label for="wpagent-email-actions-instructions"><?php esc_html_e( 'Instruções adicionais para os e-mails enviados:', 'wpagent' ); ?></label><br>
+						<textarea id="wpagent-email-actions-instructions" class="large-text" rows="3" name="wpagent_agent[email_actions_instructions]" placeholder="<?php esc_attr_e( 'Ex.: envie apenas relatórios revisados; inclua saudação formal; não insira anexos.', 'wpagent' ); ?>"><?php echo esc_textarea( $agent['email_actions_instructions'] ); ?></textarea>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Perfil declarado pelo usuário', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[user_profile_enabled]" value="1" <?php checked( $agent['user_profile_enabled'], '1' ); ?>> <?php esc_html_e( 'Permitir que usuários informem dados pessoais para o agente considerar nas respostas.', 'wpagent' ); ?></label>
+					<p style="margin-top: 10px;">
+						<label for="wpagent-user-profile-label"><?php esc_html_e( 'Título do botão/campo do perfil:', 'wpagent' ); ?></label><br>
+						<input id="wpagent-user-profile-label" class="regular-text" name="wpagent_agent[user_profile_label]" value="<?php echo esc_attr( $agent['user_profile_label'] ); ?>" placeholder="<?php esc_attr_e( 'Sobre você', 'wpagent' ); ?>">
+					</p>
+					<p>
+						<label for="wpagent-user-profile-description"><?php esc_html_e( 'Descrição orientativa para o usuário:', 'wpagent' ); ?></label><br>
+						<textarea id="wpagent-user-profile-description" class="large-text" rows="2" name="wpagent_agent[user_profile_description]" placeholder="<?php esc_attr_e( 'Explique quais informações ajudam este agente a personalizar o atendimento.', 'wpagent' ); ?>"><?php echo esc_textarea( $agent['user_profile_description'] ); ?></textarea>
+					</p>
+					<p>
+						<label for="wpagent-user-profile-fields"><?php esc_html_e( 'Campos estruturados do formulário de perfil:', 'wpagent' ); ?></label><br>
+						<textarea id="wpagent-user-profile-fields" class="large-text code" rows="4" name="wpagent_agent[user_profile_fields]" placeholder="<?php esc_attr_e( 'Ano escolar | ano_escolar | text | Ex.: 3º ano', 'wpagent' ); ?>"><?php echo esc_textarea( $this->profile_fields_to_text( $agent['user_profile_fields'] ?? array() ) ); ?></textarea>
+					</p>
+					<p class="description"><?php esc_html_e( 'Um campo por linha no formato: Rótulo | chave | tipo | placeholder (tipos aceitos: text ou textarea). As respostas entram no prompt do agente.', 'wpagent' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Resumo de conversas por IA', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[conversation_summary_enabled]" value="1" <?php checked( $agent['conversation_summary_enabled'], '1' ); ?>> <?php esc_html_e( 'Gerar resumo automático da conversa após período de inatividade do visitante.', 'wpagent' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Os resumos gerados pela IA são exibidos no menu "Atendimentos" para consulta e acompanhamento da equipe de suporte.', 'wpagent' ); ?></p>
+					<p style="margin-top: 8px;">
+						<label>
+							<?php esc_html_e( 'Horas de inatividade antes de gerar o resumo:', 'wpagent' ); ?>
+							<input class="small-text" type="number" min="1" max="168" name="wpagent_agent[conversation_summary_delay]" value="<?php echo esc_attr( $agent['conversation_summary_delay'] ); ?>">
+						</label>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Consumo de tokens no chat', 'wpagent' ); ?></th>
+				<td>
+					<label><input type="checkbox" name="wpagent_agent[show_token_usage]" value="1" <?php checked( $agent['show_token_usage'], '1' ); ?>> <?php esc_html_e( 'Exibir o consumo mensal de tokens do usuário logado na interface do shortcode.', 'wpagent' ); ?></label>
 				</td>
 			</tr>
 			<tr>
@@ -163,14 +276,14 @@ class WPAgent_Agents {
 						<option value="wordpress_ai" <?php selected( $agent['provider_mode'], 'wordpress_ai' ); ?>><?php esc_html_e( 'WordPress AI / Connectors (recomendado)', 'wpagent' ); ?></option>
 						<option value="wpagent_openrouter" <?php selected( $agent['provider_mode'], 'wpagent_openrouter' ); ?>><?php esc_html_e( 'OpenRouter direto pelo WPAgent', 'wpagent' ); ?></option>
 					</select>
-					<p class="description"><?php esc_html_e( 'Use WordPress AI para aproveitar OpenAI, Gemini, Claude, OpenRouter ou outros conectores configurados no plugin oficial de IA do WordPress. O OpenRouter direto permanece disponivel como fallback ou opcao avancada.', 'wpagent' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Use WordPress AI para aproveitar OpenAI, Gemini, Claude ou conectores oficiais de IA do WordPress. O OpenRouter direto permanece disponível como fallback ou opção dedicada.', 'wpagent' ); ?></p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row"><label for="wpagent-agent-model"><?php esc_html_e( 'Modelo OpenRouter direto', 'wpagent' ); ?></label></th>
 				<td>
 					<input id="wpagent-agent-model" class="regular-text" name="wpagent_agent[openrouter_model]" value="<?php echo esc_attr( $agent['openrouter_model'] ); ?>">
-					<p class="description"><?php esc_html_e( 'Usado somente quando este agente estiver em OpenRouter direto ou quando o WordPress AI falhar e houver uma chave OpenRouter no WPAgent.', 'wpagent' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Utilizado apenas quando este agente estiver configurado em OpenRouter direto ou como fallback da conexão.', 'wpagent' ); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -187,121 +300,35 @@ class WPAgent_Agents {
 						</label>
 					</p>
 					<?php $this->render_ai_model_datalists(); ?>
-					<p class="description"><?php esc_html_e( 'Deixe em branco para herdar o modelo padrao definido em WPAgent > Settings. Preencha apenas quando este agente precisar usar um provider/model especifico.', 'wpagent' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Deixe em branco para herdar o modelo padrão configurado em WPAgents > Configurações.', 'wpagent' ); ?></p>
 					<p class="description">
 						<?php
 						printf(
 							/* translators: 1: provider id, 2: model id. */
 							esc_html__( 'Modelo efetivo atual: %1$s / %2$s', 'wpagent' ),
-							esc_html( $agent['wordpress_ai_provider'] ?: __( 'automatico', 'wpagent' ) ),
-							esc_html( $agent['wordpress_ai_model'] ?: __( 'automatico', 'wpagent' ) )
+							esc_html( $agent['wordpress_ai_provider'] ?: __( 'automático', 'wpagent' ) ),
+							esc_html( $agent['wordpress_ai_model'] ?: __( 'automático', 'wpagent' ) )
 						);
 						?>
 					</p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Visitantes anonimos', 'wpagent' ); ?></th>
-				<td><label><input type="checkbox" name="wpagent_agent[allow_guest_chat]" value="1" <?php checked( $agent['allow_guest_chat'], '1' ); ?>> <?php esc_html_e( 'Permitir chat sem login para este agente.', 'wpagent' ); ?></label></td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Assistente publico do site', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[public_site_assistant]" value="1" <?php checked( $agent['public_site_assistant'], '1' ); ?>> <?php esc_html_e( 'Exibir este agente automaticamente como pop-up no front-end para visitantes.', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'Use para atendimento publico do site. Ao ativar, o chat sem login tambem fica habilitado para este agente.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Assistente interno do admin', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[admin_assistant]" value="1" <?php checked( $agent['admin_assistant'], '1' ); ?>> <?php esc_html_e( 'Exibir este agente automaticamente como pop-up no painel para administradores.', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'Use para apoio operacional no WordPress. Nesta versao ele conversa no painel; a execucao de acoes administrativas deve ser habilitada por ferramentas com permissao propria.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Perfil declarado pelo usuario', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[user_profile_enabled]" value="1" <?php checked( $agent['user_profile_enabled'], '1' ); ?>> <?php esc_html_e( 'Permitir que usuarios logados informem dados pessoais para este agente considerar nas respostas.', 'wpagent' ); ?></label>
-					<p>
-						<label for="wpagent-user-profile-label"><?php esc_html_e( 'Titulo do campo', 'wpagent' ); ?></label><br>
-						<input id="wpagent-user-profile-label" class="regular-text" name="wpagent_agent[user_profile_label]" value="<?php echo esc_attr( $agent['user_profile_label'] ); ?>" placeholder="<?php esc_attr_e( 'Sobre voce', 'wpagent' ); ?>">
-					</p>
-					<p>
-						<label for="wpagent-user-profile-description"><?php esc_html_e( 'Descricao para o usuario', 'wpagent' ); ?></label><br>
-						<textarea id="wpagent-user-profile-description" class="large-text" rows="3" name="wpagent_agent[user_profile_description]" placeholder="<?php esc_attr_e( 'Explique quais informacoes ajudam este agente a personalizar as respostas.', 'wpagent' ); ?>"><?php echo esc_textarea( $agent['user_profile_description'] ); ?></textarea>
-					</p>
-					<p>
-						<label for="wpagent-user-profile-fields"><?php esc_html_e( 'Campos estruturados', 'wpagent' ); ?></label><br>
-						<textarea id="wpagent-user-profile-fields" class="large-text code" rows="6" name="wpagent_agent[user_profile_fields]" placeholder="<?php esc_attr_e( 'Ano em que leciono | teaching_year | text | Ex.: 7 ano', 'wpagent' ); ?>"><?php echo esc_textarea( $this->profile_fields_to_text( $agent['user_profile_fields'] ?? array() ) ); ?></textarea>
-					</p>
-					<p class="description"><?php esc_html_e( 'Adicione um campo por linha no formato: Rotulo | chave | tipo | placeholder. Tipos aceitos: text ou textarea. A chave deve usar letras, numeros e sublinhado.', 'wpagent' ); ?></p>
-					<p class="description"><?php esc_html_e( 'Use para orientar o usuario a informar contexto estavel, como turma, area de atuacao, estilo pessoal, objetivos e preferencias. Essas informacoes entram no prompt como contexto declarado pelo usuario.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Envio de email autorizado', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[email_actions_enabled]" value="1" <?php checked( $agent['email_actions_enabled'], '1' ); ?>> <?php esc_html_e( 'Permitir que este agente prepare emails para envio apos confirmacao do usuario.', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'O agente pode coletar email, nome e dados relevantes durante a conversa, mas o envio so acontece quando o usuario confirma no botao exibido pelo WPAgent.', 'wpagent' ); ?></p>
-					<p>
-						<label for="wpagent-email-actions-instructions"><?php esc_html_e( 'Instrucoes adicionais para emails', 'wpagent' ); ?></label><br>
-						<textarea id="wpagent-email-actions-instructions" class="large-text" rows="4" name="wpagent_agent[email_actions_instructions]" placeholder="<?php esc_attr_e( 'Ex.: envie apenas materiais finalizados; inclua uma saudacao curta; nao envie anexos.', 'wpagent' ); ?>"><?php echo esc_textarea( $agent['email_actions_instructions'] ); ?></textarea>
-					</p>
-					<p class="description"><?php esc_html_e( 'Use para casos como enviar plano de aula, mensagem pastoral, resumo, proposta, dados de produto ou material de apoio. O envio usa wp_mail(), entao a entrega depende da configuracao de email/SMTP do WordPress.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="wpagent-agent-system-prompt"><?php esc_html_e( 'Instrucao base', 'wpagent' ); ?></label></th>
-				<td>
-					<textarea id="wpagent-agent-system-prompt" class="large-text" rows="10" name="wpagent_agent[system_prompt]"><?php echo esc_textarea( $agent['system_prompt'] ); ?></textarea>
-					<p class="description"><?php esc_html_e( 'Define o papel, tom, limites e regras fixas do agente. Links externos aqui sao tratados como texto; para usar o conteudo, importe ou cole o material em Treinamentos.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Limites de contexto', 'wpagent' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'Limites de contexto & memória', 'wpagent' ); ?></th>
 				<td>
 					<label><?php esc_html_e( 'Treinamentos', 'wpagent' ); ?> <input class="small-text" type="number" min="0" name="wpagent_agent[max_knowledge_items]" value="<?php echo esc_attr( $agent['max_knowledge_items'] ); ?>"></label>
-					<label><?php esc_html_e( 'Memorias', 'wpagent' ); ?> <input class="small-text" type="number" min="0" name="wpagent_agent[max_memory_items]" value="<?php echo esc_attr( $agent['max_memory_items'] ); ?>"></label>
-					<label><?php esc_html_e( 'Interacoes', 'wpagent' ); ?> <input class="small-text" type="number" min="0" name="wpagent_agent[max_recent_interactions]" value="<?php echo esc_attr( $agent['max_recent_interactions'] ); ?>"></label>
-					<p class="description"><?php esc_html_e( 'Treinamentos: quantidade maxima de trechos da base do agente enviados ao modelo. Memorias: registros persistentes sobre o usuario. Interacoes: pares recentes de pergunta/resposta da conversa atual.', 'wpagent' ); ?></p>
-					<p class="description"><?php esc_html_e( 'Valores maiores dao mais contexto, mas aumentam custo, latencia e risco de ultrapassar o limite do modelo.', 'wpagent' ); ?></p>
+					<label><?php esc_html_e( 'Memórias', 'wpagent' ); ?> <input class="small-text" type="number" min="0" name="wpagent_agent[max_memory_items]" value="<?php echo esc_attr( $agent['max_memory_items'] ); ?>"></label>
+					<label><?php esc_html_e( 'Interações', 'wpagent' ); ?> <input class="small-text" type="number" min="0" name="wpagent_agent[max_recent_interactions]" value="<?php echo esc_attr( $agent['max_recent_interactions'] ); ?>"></label>
+					<p class="description"><?php esc_html_e( 'Treinamentos: quantidade máxima de trechos documentais da base RAG enviados na requisição. Memórias: registros de contexto pessoal. Interações: pares recentes de pergunta e resposta.', 'wpagent' ); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Limites de tokens', 'wpagent' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'Limites de tokens por usuário', 'wpagent' ); ?></th>
 				<td>
 					<label><?php esc_html_e( 'Por dia', 'wpagent' ); ?> <input class="regular-text" type="number" min="0" name="wpagent_agent[token_limit_day]" value="<?php echo esc_attr( $agent['token_limit_day'] ); ?>"></label><br>
 					<label><?php esc_html_e( 'Por semana', 'wpagent' ); ?> <input class="regular-text" type="number" min="0" name="wpagent_agent[token_limit_week]" value="<?php echo esc_attr( $agent['token_limit_week'] ); ?>"></label><br>
-					<label><?php esc_html_e( 'Por mes', 'wpagent' ); ?> <input class="regular-text" type="number" min="0" name="wpagent_agent[token_limit_month]" value="<?php echo esc_attr( $agent['token_limit_month'] ); ?>"></label>
-					<p class="description"><?php esc_html_e( 'Controla o total de tokens consumidos por este agente em todos os usuarios. Use 0 para ilimitado. O bloqueio acontece quando o consumo registrado do periodo atinge o limite.', 'wpagent' ); ?></p>
-					<p class="description"><?php esc_html_e( 'A contagem depende do fornecedor retornar uso de tokens. OpenRouter normalmente retorna; alguns conectores do WordPress AI podem retornar 0.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Uso mensal no chat', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[show_token_usage]" value="1" <?php checked( $agent['show_token_usage'], '1' ); ?>> <?php esc_html_e( 'Mostrar o consumo mensal de tokens deste usuario no shortcode.', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'Esta opcao apenas controla a exibicao no chat. O limite mensal por usuario continua sendo configurado nas Configuracoes Gerais.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Contexto do site', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[site_context_enabled]" value="1" <?php checked( $agent['site_context_enabled'], '1' ); ?>> <?php esc_html_e( 'Injetar informacoes publicas do site no contexto do agente (homepage, paginas, posts recentes).', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'Quando ativo, o agente recebe automaticamente o conteudo publico do site (titulo, descricao, paginas, posts recentes) para dar respostas mais contextualizadas. Recomendado para agentes de atendimento ao visitante.', 'wpagent' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Resumo de conversas', 'wpagent' ); ?></th>
-				<td>
-					<label><input type="checkbox" name="wpagent_agent[conversation_summary_enabled]" value="1" <?php checked( $agent['conversation_summary_enabled'], '1' ); ?>> <?php esc_html_e( 'Gerar resumo automatico das conversas apos periodo de inatividade.', 'wpagent' ); ?></label>
-					<p class="description"><?php esc_html_e( 'Quando ativo, o WPAgent gera um resumo da conversa quando o usuario fica inativo por um tempo determinado. O resumo fica disponivel na pagina Atendimentos para consulta e follow-up humano.', 'wpagent' ); ?></p>
-					<p>
-						<label>
-							<?php esc_html_e( 'Horas de inatividade antes de gerar resumo:', 'wpagent' ); ?>
-							<input class="small-text" type="number" min="1" max="168" name="wpagent_agent[conversation_summary_delay]" value="<?php echo esc_attr( $agent['conversation_summary_delay'] ); ?>">
-						</label>
-					</p>
+					<label><?php esc_html_e( 'Por mês', 'wpagent' ); ?> <input class="regular-text" type="number" min="0" name="wpagent_agent[token_limit_month]" value="<?php echo esc_attr( $agent['token_limit_month'] ); ?>"></label>
+					<p class="description"><?php esc_html_e( 'Controla a cota máxima de consumo de tokens do agente por usuário. Digite 0 para cota ilimitada.', 'wpagent' ); ?></p>
 				</td>
 			</tr>
 		</table>
@@ -313,16 +340,16 @@ class WPAgent_Agents {
 		$default_theme = 'dark' === $agent['default_theme'] ? 'dark' : 'light';
 		?>
 		<p><code>[wpagent_chat agent="<?php echo esc_attr( $agent['slug'] ); ?>"]</code></p>
-		<p class="description"><?php esc_html_e( 'Cole este shortcode em qualquer pagina ou post.', 'wpagent' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Cole este shortcode em qualquer página ou post do seu site.', 'wpagent' ); ?></p>
 		<hr>
 		<p>
-			<label for="wpagent-agent-default-theme"><?php esc_html_e( 'Aparencia padrao do chat', 'wpagent' ); ?></label><br>
+			<label for="wpagent-agent-default-theme"><?php esc_html_e( 'Aparência padrão do chat', 'wpagent' ); ?></label><br>
 			<select id="wpagent-agent-default-theme" name="wpagent_agent[default_theme]">
 				<option value="light" <?php selected( $default_theme, 'light' ); ?>><?php esc_html_e( 'Modo claro', 'wpagent' ); ?></option>
 				<option value="dark" <?php selected( $default_theme, 'dark' ); ?>><?php esc_html_e( 'Modo escuro', 'wpagent' ); ?></option>
 			</select>
 		</p>
-		<p class="description"><?php esc_html_e( 'Define se o chat abre em modo claro ou escuro antes de o visitante alternar com o botao de tema.', 'wpagent' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Define se a janela do chat abre em modo claro ou escuro antes de o visitante alternar pelo botão de tema.', 'wpagent' ); ?></p>
 		<?php
 	}
 
@@ -437,6 +464,7 @@ class WPAgent_Agents {
 
 		$values = array(
 			'_wpagent_agent_slug'              => $slug,
+			'_wpagent_allowed_roles'           => isset( $input['allowed_roles'] ) && is_array( $input['allowed_roles'] ) ? array_map( 'sanitize_key', $input['allowed_roles'] ) : array(),
 			'_wpagent_provider_mode'           => in_array( $input['provider_mode'] ?? '', array( 'wpagent_openrouter', 'wordpress_ai' ), true ) ? $input['provider_mode'] : 'wordpress_ai',
 			'_wpagent_openrouter_model'        => sanitize_text_field( $input['openrouter_model'] ?? $this->settings->get( 'openrouter_model', 'openai/gpt-4.1-mini' ) ),
 			'_wpagent_wordpress_ai_provider'   => sanitize_key( $input['wordpress_ai_provider'] ?? '' ),
@@ -447,6 +475,8 @@ class WPAgent_Agents {
 			'_wpagent_admin_assistant'         => empty( $input['admin_assistant'] ) ? '0' : '1',
 			'_wpagent_default_theme'           => ( 'dark' === ( $input['default_theme'] ?? '' ) ) ? 'dark' : 'light',
 			'_wpagent_user_profile_enabled'    => empty( $input['user_profile_enabled'] ) ? '0' : '1',
+			'_wpagent_enable_projects'         => empty( $input['enable_projects'] ) ? '0' : '1',
+			'_wpagent_enable_frontend_uploads' => empty( $input['enable_frontend_uploads'] ) ? '0' : '1',
 			'_wpagent_user_profile_label'      => sanitize_text_field( $input['user_profile_label'] ?? __( 'Sobre voce', 'wpagent' ) ),
 			'_wpagent_user_profile_description' => sanitize_textarea_field( $input['user_profile_description'] ?? __( 'Compartilhe informacoes que ajudam este agente a personalizar as respostas.', 'wpagent' ) ),
 			'_wpagent_user_profile_fields'     => $this->sanitize_user_profile_fields_text( $input['user_profile_fields'] ?? '' ),
@@ -529,6 +559,7 @@ class WPAgent_Agents {
 			'post_id'                  => absint( $post_id ),
 			'name'                     => $post ? get_the_title( $post ) : $defaults['name'],
 			'slug'                     => sanitize_key( $slug ),
+			'allowed_roles'            => (array) ( get_post_meta( $post_id, '_wpagent_allowed_roles', true ) ?: array() ),
 			'provider_mode'            => $this->meta_or_default( $post_id, '_wpagent_provider_mode', $defaults['provider_mode'] ),
 			'openrouter_model'         => $this->meta_or_default( $post_id, '_wpagent_openrouter_model', $defaults['openrouter_model'] ),
 			'wordpress_ai_provider'    => $this->meta_or_default( $post_id, '_wpagent_wordpress_ai_provider', $defaults['wordpress_ai_provider'] ),
@@ -539,6 +570,8 @@ class WPAgent_Agents {
 			'admin_assistant'          => $this->meta_or_default( $post_id, '_wpagent_admin_assistant', $defaults['admin_assistant'] ),
 			'default_theme'            => $this->meta_or_default( $post_id, '_wpagent_default_theme', $defaults['default_theme'] ),
 			'user_profile_enabled'     => $this->meta_or_default( $post_id, '_wpagent_user_profile_enabled', $defaults['user_profile_enabled'] ),
+			'enable_projects'          => $this->meta_or_default( $post_id, '_wpagent_enable_projects', $defaults['enable_projects'] ),
+			'enable_frontend_uploads'  => $this->meta_or_default( $post_id, '_wpagent_enable_frontend_uploads', $defaults['enable_frontend_uploads'] ),
 			'user_profile_label'       => $this->meta_or_default( $post_id, '_wpagent_user_profile_label', $defaults['user_profile_label'] ),
 			'user_profile_description' => $this->meta_or_default( $post_id, '_wpagent_user_profile_description', $defaults['user_profile_description'] ),
 			'user_profile_fields'      => $this->profile_fields_or_default( $post_id, $defaults['user_profile_fields'] ),
@@ -683,6 +716,7 @@ class WPAgent_Agents {
 			'post_id'                  => 0,
 			'name'                     => $this->settings->get( 'agent_name', 'WPAgent' ),
 			'slug'                     => sanitize_key( $slug ?: $this->settings->get( 'agent_slug', 'default' ) ),
+			'allowed_roles'            => array(),
 			'provider_mode'            => '1' === $this->settings->get( 'use_wp_ai_client', '1' ) ? 'wordpress_ai' : 'wpagent_openrouter',
 			'openrouter_model'         => $this->settings->get( 'openrouter_model', 'openai/gpt-4.1-mini' ),
 			'wordpress_ai_provider'    => $this->settings->get( 'wordpress_ai_provider', '' ),
@@ -693,6 +727,8 @@ class WPAgent_Agents {
 			'admin_assistant'          => '0',
 			'default_theme'            => 'light',
 			'user_profile_enabled'     => '0',
+			'enable_projects'          => '0',
+			'enable_frontend_uploads'  => '0',
 			'user_profile_label'       => __( 'Sobre voce', 'wpagent' ),
 			'user_profile_description' => __( 'Compartilhe informacoes que ajudam este agente a personalizar as respostas.', 'wpagent' ),
 			'user_profile_fields'      => array(),
@@ -972,6 +1008,27 @@ class WPAgent_Agents {
 			$count,
 			absint( $source['chunk_count'] )
 		);
+	}
+
+	public function render_admin_header() {
+		$screen = get_current_screen();
+		if ( ! $screen || self::POST_TYPE !== $screen->post_type ) {
+			return;
+		}
+
+		$title    = __( 'Agentes de IA do WPAgents', 'wpagent' );
+		$subtitle = __( 'Crie, treine e personalize seus Agentes de Inteligência Artificial com memória, documentos RAG e conectores.', 'wpagent' );
+
+		WPAgent_Admin_UI::render_header( $title, $subtitle );
+	}
+
+	public function render_admin_footer() {
+		$screen = get_current_screen();
+		if ( ! $screen || self::POST_TYPE !== $screen->post_type ) {
+			return;
+		}
+
+		WPAgent_Admin_UI::render_footer();
 	}
 }
 }

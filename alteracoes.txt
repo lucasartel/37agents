@@ -1,0 +1,39 @@
+Visual do Plugin:
+Precisamos regularizar o nome do plugin como WPAgents em todos os lugares do plugin e no GitHub (alguns lugares está WPAgent);
+Ajustar o visual para o modo do Mailer conforme anexo;
+Todas as páginas devem ter o mesmo estilo CSS bonito e singular com o header do plugin, contendo logo WPAgents conforme site do projeto.
+A Ordem dos itens de menu deve ser:
+Dashboard
+Agentes
+Atendimentos
+Agendamentos
+Relatórios
+Uso de Tokens
+Configurações
+
+Dashboard:
+Ao clicar no link do WPAgents instalado no WP o usuário deve ser direcionado para uma página inicial que é um dashboard. Nesta página deve haver link para os módulos do plugin e deve haver informações e link para a página do plugin com a divulgação da configuração e suporte via pagamento de anuidade. 
+
+
+
+Feito! Testar essas melhorias, abaixo:
+
+Conteúdo periódico.
+O recurso de conteúdo periódico que hoje está como uma aba ao lado de configurações, deve ser mais um item na lista de itens de menu do plugin. Este módulo deve ser totalmente refeito, pois o usuário deve criar um agente no menu de agentes e depois ir pra página de conteúdo periódico e criar um novo conteúdo periódico. Neste formulário ele deve ter a opção de escolher o agente em uma lista e colocar as instruções do conteúdo a ser gerado e a periodicidade e a categoria do post. Este recurso deve funcionar apenas para criação de posts no modo rascunho, para aprovação posterior do administrador.
+
+Agendamentos:
+Os agendamentos ainda não estão funcionando. 
+A ideia é que o agente respeite o agendamento criado na página de agendamentos.
+Nesta página vamos tirar a opção de envio periódico, então ficaremos com o recurso de drip.
+Na página de agendamentos, ao clicar no número de inscritos, deve-se ver os usuários já cadastrados, os que receberam e os que ainda estão em progresso.
+O recurso de exportação CSV precisa funcionar.
+
+
+
+O logotipo correto para ser usado no header do plugin está nesta página https://37graus.com.br/wp-agents, inclusive este deve ser o link para onde devemos direcionar os usuários do plugin e não o GitHub como está hoje. Tanto no link de anuidade do header, quanto no footer do dashboard deve ter este link;
+Precisa colocar o header na página dos Agentes; 
+O item WPAgents deve ter o link para o dashboard e não para agentes;
+Peço que verifique os acentos e pontuações dos textos do plugin e a questão dele estar preparado pelo menos para o espanhol e inglês nos esquemas de tradução do WP;
+O ícone do WPAgents do menu lateral do WP deve ser aquelas estrelinhas que se consolidaram como símbolo de IA.
+
+
