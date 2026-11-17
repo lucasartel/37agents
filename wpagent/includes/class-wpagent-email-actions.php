@@ -22,17 +22,15 @@ class WPAgent_Email_Actions {
 		}
 
 		$lines = array(
-			'Envio de email autorizado pelo usuario:',
-			'- Voce pode preparar um email para o usuario receber uma informacao, documento, resumo, plano, mensagem ou dados de produto/servico.',
-			'- Antes de propor envio, colete somente os dados necessarios: email do destinatario, nome se util, assunto e conteudo final.',
-			'- Nunca diga que enviou. A execucao real depende de o usuario clicar no botao de confirmacao do WPAgent.',
-			'- Se faltar email valido, assunto ou conteudo, faca uma pergunta antes.',
-			'- Use este recurso somente quando o usuario pedir ou autorizar claramente o envio por email.',
-			'- Ao preparar o envio, explique brevemente o que sera enviado e termine a resposta com um bloco de JSON valido exatamente neste formato. Se o corpo tiver quebras de linha, use \\n dentro do campo body:',
+			'Envio de email autorizado pelo usuario (WPAgent Email Actions):',
+			'- Voce pode preparar um email para o usuario receber informacoes, documentos, resumos, planos de aula ou materiais por email.',
+			'- Antes de propor envio, colete os dados necessarios: email do destinatario, nome se util, assunto claro e o conteudo completo no corpo do email.',
+			'- Nao afirme que o email ja foi enviado. Explique brevemente que o envio foi preparado e que a confirmacao deve ser feita no botao que aparecera abaixo.',
+			'- OBRIGATORIO: Ao preparar o envio, termine a sua resposta exatamente com o bloco de JSON abaixo com tres crases (wpagent-email):',
 			'```wpagent-email',
-			'{"to_email":"email@exemplo.com","to_name":"Nome opcional","subject":"Assunto do email","body":"Conteudo completo do email","purpose":"Finalidade curta","data":{"campo":"valor"}}',
+			'{"to_email":"email@exemplo.com","to_name":"Nome","subject":"Assunto do email","body":"Conteudo completo do email","purpose":"Finalidade curta","data":{"destinatario":"email@exemplo.com"}}',
 			'```',
-			'- O campo body deve conter o texto final que sera enviado. O campo data deve conter apenas dados consentidos e relevantes coletados na conversa.',
+			'- O campo body deve conter o texto final completo que sera enviado ao destinatario.',
 		);
 
 		if ( ! empty( $agent['email_actions_instructions'] ) ) {
@@ -48,11 +46,48 @@ class WPAgent_Email_Actions {
 			return null;
 		}
 
-		if ( ! preg_match( '/```wpagent-email\s*([\s\S]*?)\s*```/s', (string) $reply, $matches ) ) {
+		$raw = (string) $reply;
+		$json_str = null;
+		$clean_reply = $raw;
+
+		// Pattern 1: ```wpagent-email ... ``` (or to end of text if closing backticks omitted)
+		if ( preg_match( '/```wpagent-email\s*([\s\S]*?)(?:```|$)/s', $raw, $matches ) ) {
+			$json_str    = trim( $matches[1] );
+			$clean_reply = trim( preg_replace( '/```wpagent-email\s*[\s\S]*?(?:```|$)/s', '', $raw ) );
+		}
+		// Pattern 2: [wpagent-email] ... [/wpagent-email] or [wpagent-email] ... (shortcode style)
+		elseif ( preg_match( '/\[wpagent-email\]\s*([\s\S]*?)(?:\[\/wpagent-email\]|$)/s', $raw, $matches ) ) {
+			$json_str    = trim( $matches[1] );
+			$clean_reply = trim( preg_replace( '/\[wpagent-email\]\s*[\s\S]*?(?:\[\/wpagent-email\]|$)/s', '', $raw ) );
+		}
+		// Pattern 3: <wpagent-email> ... </wpagent-email>
+		elseif ( preg_match( '/<wpagent-email>\s*([\s\S]*?)(?:<\/wpagent-email>|$)/s', $raw, $matches ) ) {
+			$json_str    = trim( $matches[1] );
+			$clean_reply = trim( preg_replace( '/<wpagent-email>\s*[\s\S]*?(?:<\/wpagent-email>|$)/s', '', $raw ) );
+		}
+		// Pattern 4: any block containing "to_email" JSON
+		elseif ( preg_match( '/(?:```(?:json)?\s*)?(\{[\s\S]*?"to_email"[\s\S]*?\})(?:\s*```)?/s', $raw, $matches ) ) {
+			$json_str    = trim( $matches[1] );
+			$clean_reply = trim( preg_replace( '/(?:```(?:json)?\s*)?\{[\s\S]*?"to_email"[\s\S]*?\}(?:\s*```)?/s', '', $raw ) );
+		}
+
+		if ( empty( $json_str ) ) {
 			return null;
 		}
 
-		$data = json_decode( trim( $matches[1] ), true );
+		// Decode JSON directly
+		$data = json_decode( $json_str, true );
+
+		// Fallback: extract the outermost {...} if extra text is present
+		if ( ! is_array( $data ) ) {
+			$start = strpos( $json_str, '{' );
+			$end   = strrpos( $json_str, '}' );
+			if ( false !== $start && false !== $end && $end > $start ) {
+				$sub  = substr( $json_str, $start, $end - $start + 1 );
+				$data = json_decode( $sub, true );
+			}
+		}
+
 		if ( ! is_array( $data ) ) {
 			return null;
 		}
@@ -62,7 +97,6 @@ class WPAgent_Email_Actions {
 			return null;
 		}
 
-		$clean_reply = trim( preg_replace( '/```wpagent-email\s*[\s\S]*?\s*```/s', '', (string) $reply ) );
 		if ( '' === $clean_reply ) {
 			$clean_reply = __( 'Preparei um email para sua revisao.', 'wpagent' );
 		}
@@ -74,13 +108,20 @@ class WPAgent_Email_Actions {
 	}
 
 	public function prepare_proposal( $data, $agent ) {
+		$to_email = sanitize_email( $data['to_email'] ?? $data['email'] ?? $data['recipient'] ?? '' );
+		$to_name  = sanitize_text_field( $data['to_name'] ?? $data['nome'] ?? $data['name'] ?? '' );
+		$subject  = substr( sanitize_text_field( $data['subject'] ?? $data['assunto'] ?? '' ), 0, 180 );
+		$raw_body = $data['body'] ?? $data['corpo'] ?? $data['conteudo'] ?? $data['message'] ?? '';
+		$body     = substr( sanitize_textarea_field( $raw_body ), 0, (int) apply_filters( 'wpagent_email_body_max_length', 20000, $agent ) );
+		$purpose  = substr( sanitize_text_field( $data['purpose'] ?? $data['finalidade'] ?? '' ), 0, 180 );
+
 		$payload = array(
 			'agent_slug' => sanitize_key( $agent['slug'] ?? 'default' ),
-			'to_email'   => sanitize_email( $data['to_email'] ?? '' ),
-			'to_name'    => sanitize_text_field( $data['to_name'] ?? '' ),
-			'subject'    => substr( sanitize_text_field( $data['subject'] ?? '' ), 0, 180 ),
-			'body'       => substr( sanitize_textarea_field( $data['body'] ?? '' ), 0, (int) apply_filters( 'wpagent_email_body_max_length', 20000, $agent ) ),
-			'purpose'    => substr( sanitize_text_field( $data['purpose'] ?? '' ), 0, 180 ),
+			'to_email'   => $to_email,
+			'to_name'    => $to_name,
+			'subject'    => $subject,
+			'body'       => $body,
+			'purpose'    => $purpose,
 			'data'       => $this->sanitize_data( $data['data'] ?? array() ),
 		);
 
@@ -141,14 +182,33 @@ class WPAgent_Email_Actions {
 			return new WP_Error( 'wpagent_email_not_queued', __( 'Nao foi possivel registrar o email para envio.', 'wpagent' ), array( 'status' => 500 ) );
 		}
 
-		$scheduled = wp_schedule_single_event( time() + 5, 'wpagent_send_queued_email', array( $event_id ) );
-		if ( ! $scheduled ) {
-			$this->repository->update_email_event_status( $event_id, 'failed', __( 'Nao foi possivel agendar o envio do email.', 'wpagent' ) );
-
-			return new WP_Error( 'wpagent_email_not_scheduled', __( 'Nao foi possivel agendar o envio do email.', 'wpagent' ), array( 'status' => 500, 'event_id' => $event_id ) );
+		// Attempt immediate delivery first
+		$sent = $this->send_queued_email( $event_id );
+		if ( $sent ) {
+			return array(
+				'sent'     => true,
+				'event_id' => $event_id,
+				'to_email' => $prepared['to_email'],
+				'subject'  => $prepared['subject'],
+				'message'  => __( 'Email enviado com sucesso!', 'wpagent' ),
+			);
 		}
 
-		$this->spawn_cron();
+		// Check if immediate send failed with error
+		$event = $this->repository->get_email_event( $event_id );
+		if ( $event && 'failed' === $event['status'] ) {
+			return new WP_Error(
+				'wpagent_email_send_failed',
+				! empty( $event['error_message'] ) ? $event['error_message'] : __( 'O WordPress não conseguiu enviar o email via wp_mail(). Verifique se há um plugin de SMTP (como WP Mail SMTP ou FluentSMTP) ativo e configurado.', 'wpagent' ),
+				array( 'status' => 500, 'event_id' => $event_id )
+			);
+		}
+
+		// Fallback: schedule in WP-Cron if not failed
+		$scheduled = wp_schedule_single_event( time() + 5, 'wpagent_send_queued_email', array( $event_id ) );
+		if ( $scheduled ) {
+			$this->spawn_cron();
+		}
 
 		return array(
 			'queued'   => true,
@@ -162,7 +222,7 @@ class WPAgent_Email_Actions {
 	public function send_queued_email( $event_id ) {
 		$event = $this->repository->get_email_event( $event_id );
 		if ( ! $event || ! in_array( $event['status'], array( 'queued', 'pending' ), true ) ) {
-			return;
+			return false;
 		}
 
 		$to = sanitize_email( $event['recipient_email'] ?? '' );
@@ -171,18 +231,19 @@ class WPAgent_Email_Actions {
 
 		if ( ! is_email( $to ) || '' === trim( $subject ) || '' === trim( $body ) ) {
 			$this->repository->update_email_event_status( $event_id, 'failed', __( 'O email agendado perdeu destinatario, assunto ou conteudo valido.', 'wpagent' ) );
-			return;
+			return false;
 		}
 
 		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
 		$sent = wp_mail( $to, $subject, $body, $headers );
 
 		if ( ! $sent ) {
-			$this->repository->update_email_event_status( $event_id, 'failed', __( 'O WordPress nao conseguiu enviar o email. Verifique a configuracao SMTP/hospedagem.', 'wpagent' ) );
-			return;
+			$this->repository->update_email_event_status( $event_id, 'failed', __( 'O WordPress nao conseguiu enviar o email via wp_mail(). Verifique se ha um plugin de SMTP (como WP Mail SMTP ou FluentSMTP) ativo e configurado.', 'wpagent' ) );
+			return false;
 		}
 
 		$this->repository->update_email_event_status( $event_id, 'sent', '' );
+		return true;
 	}
 
 	private function sanitize_data( $data ) {

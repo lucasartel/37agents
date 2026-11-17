@@ -30,10 +30,11 @@ class WPAgent_Dashboard {
 		if ( ! $screen || false === strpos( $screen->id, 'wpagent' ) ) {
 			return;
 		}
-		$wp_ai_available  = function_exists( 'wp_ai_client_prompt' ) || function_exists( 'WordPress\\AI\\get_ai_service' );
-		$settings         = get_option( 'wpagent_settings', array() );
-		$openrouter_key   = ! empty( $settings['openrouter_api_key'] );
-		if ( $wp_ai_available || $openrouter_key ) {
+		$wp_ai_available = function_exists( 'wp_ai_client_prompt' ) || function_exists( 'WordPress\\AI\\get_ai_service' );
+		$settings        = class_exists( 'WPAgent_Settings' ) ? ( new WPAgent_Settings() )->all() : get_option( 'wpagent_settings', array() );
+		$openrouter_key  = ! empty( $settings['openrouter_api_key'] );
+		$compatible_key  = ! empty( $settings['compatible_api_key'] );
+		if ( $wp_ai_available || $openrouter_key || $compatible_key ) {
 			return;
 		}
 		$settings_url = admin_url( 'admin.php?page=wpagent-settings' );
@@ -42,7 +43,7 @@ class WPAgent_Dashboard {
 		printf(
 			/* translators: 1: settings URL */
 			wp_kses(
-				__( '<strong>WPAgents:</strong> Nenhum provedor de IA configurado. Configure a chave OpenRouter ou ative o WordPress AI Client em <a href="%1$s">Configurações</a>.', 'wpagent' ),
+				__( '<strong>37agents:</strong> Nenhum provedor de IA configurado. Configure um Plano de IA Compatível (Xiaomi MiMo, Qwen, GLM, Kimi), chave OpenRouter ou ative o WordPress AI Client em <a href="%1$s">Configurações</a>.', 'wpagent' ),
 				array( 'strong' => array(), 'a' => array( 'href' => array() ) )
 			),
 			esc_url( $settings_url )
@@ -60,16 +61,34 @@ class WPAgent_Dashboard {
 
 	private function get_provider_status() {
 		$wp_ai_available = function_exists( 'wp_ai_client_prompt' ) || function_exists( 'WordPress\\AI\\get_ai_service' );
-		$settings        = get_option( 'wpagent_settings', array() );
+		$settings        = class_exists( 'WPAgent_Settings' ) ? ( new WPAgent_Settings() )->all() : get_option( 'wpagent_settings', array() );
+		$default_mode    = $settings['default_provider_mode'] ?? ( '1' === ( $settings['use_wp_ai_client'] ?? '1' ) ? 'wordpress_ai' : 'wpagent_openrouter' );
 		$openrouter_key  = ! empty( $settings['openrouter_api_key'] );
+		$compatible_key  = ! empty( $settings['compatible_api_key'] );
+		$presets         = class_exists( 'WPAgent_Settings' ) ? WPAgent_Settings::get_compatible_provider_presets() : array();
+		$preset_key      = $settings['compatible_provider_preset'] ?? 'xiaomi_token_plan';
+		$preset_label    = $presets[ $preset_key ]['label'] ?? __( 'Plano de IA / API Compatível', 'wpagent' );
+		$compat_model    = trim( (string) ( $settings['compatible_model'] ?? '' ) );
 
-		if ( $wp_ai_available ) {
+		if ( $compatible_key && ( 'wpagent_compatible' === $default_mode || ! $wp_ai_available ) ) {
+			return array(
+				'status' => 'compatible',
+				'label'  => $preset_label,
+				'icon'   => '🚀',
+				'color'  => '#ff6900',
+				'desc'   => sprintf(
+					/* translators: %s: configured model name */
+					__( 'Conectado via API compatível OpenAI (modelo padrão: %s).', 'wpagent' ),
+					$compat_model ?: __( 'definido por agente', 'wpagent' )
+				),
+			);
+		} elseif ( $wp_ai_available ) {
 			return array(
 				'status' => 'wp_ai',
 				'label'  => __( 'WordPress AI Client', 'wpagent' ),
 				'icon'   => '🔗',
 				'color'  => '#1a73e8',
-				'desc'   => __( 'Usando conectores nativos do WordPress AI. OpenRouter disponível como fallback.', 'wpagent' ),
+				'desc'   => __( 'Usando conectores nativos do WordPress AI. Planos compatíveis / OpenRouter disponíveis como fallback.', 'wpagent' ),
 			);
 		} elseif ( $openrouter_key ) {
 			return array(
@@ -79,13 +98,25 @@ class WPAgent_Dashboard {
 				'color'  => '#6c47ff',
 				'desc'   => __( 'Usando OpenRouter como provedor principal. Acesso a centenas de modelos de IA.', 'wpagent' ),
 			);
+		} elseif ( $compatible_key ) {
+			return array(
+				'status' => 'compatible',
+				'label'  => $preset_label,
+				'icon'   => '🚀',
+				'color'  => '#ff6900',
+				'desc'   => sprintf(
+					/* translators: %s: configured model name */
+					__( 'Conectado via API compatível OpenAI (modelo padrão: %s).', 'wpagent' ),
+					$compat_model ?: __( 'definido por agente', 'wpagent' )
+				),
+			);
 		} else {
 			return array(
 				'status' => 'none',
 				'label'  => __( 'Nenhum provedor configurado', 'wpagent' ),
 				'icon'   => '⚠️',
 				'color'  => '#d93025',
-				'desc'   => __( 'Configure a chave OpenRouter ou ative o WordPress AI Client para os agentes funcionarem.', 'wpagent' ),
+				'desc'   => __( 'Configure um Plano de IA Compatível (Xiaomi MiMo, Qwen, GLM, Kimi), OpenRouter ou ative o WordPress AI Client.', 'wpagent' ),
 			);
 		}
 	}
@@ -98,7 +129,7 @@ class WPAgent_Dashboard {
 		$provider = $this->get_provider_status();
 
 		WPAgent_Admin_UI::render_header(
-			__( 'Dashboard Central WPAgents', 'wpagent' ),
+			__( 'Dashboard Central 37agents', 'wpagent' ),
 			__( 'Visao geral, acessos rapidos aos modulos de IA e suporte oficial.', 'wpagent' )
 		);
 		?>
@@ -131,6 +162,15 @@ class WPAgent_Dashboard {
 					<p class="wpagents-dashboard-card-desc"><?php esc_html_e( 'Histórico completo de conversas dos seus visitantes com resumos e insights automáticos por IA.', 'wpagent' ); ?></p>
 				</div>
 				<span class="wpagents-dashboard-card-link"><?php esc_html_e( 'Ver Atendimentos →', 'wpagent' ); ?></span>
+			</a>
+
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent-comment-moderation' ) ); ?>" class="wpagents-dashboard-card">
+				<div>
+					<div class="wpagents-dashboard-card-icon">🛡️</div>
+					<h3 class="wpagents-dashboard-card-title"><?php esc_html_e( 'Moderação de Comentários', 'wpagent' ); ?></h3>
+					<p class="wpagents-dashboard-card-desc"><?php esc_html_e( 'Triagem inteligente de spam, análise de sentimento e sugestão de respostas com 1 clique para comentários.', 'wpagent' ); ?></p>
+				</div>
+				<span class="wpagents-dashboard-card-link"><?php esc_html_e( 'Moderar Comentários →', 'wpagent' ); ?></span>
 			</a>
 
 			<?php /*
@@ -183,12 +223,12 @@ class WPAgent_Dashboard {
 
 		<div class="wpagents-support-banner">
 			<div class="wpagents-support-content">
-				<h3><?php esc_html_e( 'Potencialize seus Agentes com Configuração Sob Medida & Suporte Premium', 'wpagent' ); ?></h3>
-				<p><?php esc_html_e( 'Com o plano de anuidade oficial do WPAgents, você garante suporte técnico prioritário, consultoria para curadoria dos seus agentes e sequências do Mailer, além de atualizações e novas habilidades de IA para o seu WordPress.', 'wpagent' ); ?></p>
+				<h3><?php esc_html_e( 'Potencialize seus Agentes no 37agents com Documentação & Suporte Especializado', 'wpagent' ); ?></h3>
+				<p><?php esc_html_e( 'Explore guias avançados de RAG, fluxos Steps, cursos EAD e consultoria técnica para personalizar o 37agents no seu site WordPress.', 'wpagent' ); ?></p>
 			</div>
 			<div class="wpagents-support-actions">
-				<a href="https://37graus.com.br/wp-agents" target="_blank" class="wpagents-btn-light">
-					<span>🚀 <?php esc_html_e( 'Conhecer Anuidade Oficial', 'wpagent' ); ?></span>
+				<a href="https://37graus.com.br/wp-agents" target="_blank" rel="noopener noreferrer" class="wpagents-btn-light">
+					<span>📖 <?php esc_html_e( 'Ver Documentação & Suporte', 'wpagent' ); ?></span>
 				</a>
 			</div>
 		</div>

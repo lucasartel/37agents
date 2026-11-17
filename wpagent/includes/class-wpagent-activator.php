@@ -286,6 +286,41 @@ class WPAgent_Activator {
 			KEY next_run (status, next_run_at)
 		) {$charset_collate};";
 
+		$user_progress = $wpdb->prefix . 'wpagent_user_progress';
+		$sql[] = "CREATE TABLE {$user_progress} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			session_id varchar(120) NOT NULL DEFAULT '',
+			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			layout_type varchar(40) NOT NULL DEFAULT 'steps',
+			current_step int unsigned NOT NULL DEFAULT 0,
+			completed_steps longtext NULL,
+			current_lesson varchar(120) NOT NULL DEFAULT '',
+			completed_lessons longtext NULL,
+			final_report longtext NULL,
+			status varchar(40) NOT NULL DEFAULT 'in_progress',
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY user_agent_layout (user_id, agent_slug, layout_type),
+			KEY session_agent_layout (session_id, agent_slug, layout_type)
+		) {$charset_collate};";
+
+		$ead_lessons = $wpdb->prefix . 'wpagent_ead_lessons';
+		$sql[] = "CREATE TABLE {$ead_lessons} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			lesson_key varchar(64) NOT NULL DEFAULT '',
+			module_title varchar(255) NOT NULL DEFAULT '',
+			lesson_title varchar(255) NOT NULL DEFAULT '',
+			content longtext NOT NULL,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY agent_lesson (agent_slug, lesson_key),
+			KEY agent_slug (agent_slug)
+		) {$charset_collate};";
+
 		foreach ( $sql as $statement ) {
 			dbDelta( $statement );
 		}
@@ -334,6 +369,7 @@ class WPAgent_Activator {
 			'wpagent_send_email_events',
 			'wpagent_process_email_schedules',
 			'wpagent_process_conversation_summaries',
+			'wpagent_comment_moderation_cron',
 		);
 		foreach ( $hooks as $hook ) {
 			$timestamp = wp_next_scheduled( $hook );

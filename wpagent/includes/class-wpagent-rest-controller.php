@@ -138,6 +138,26 @@ class WPAgent_REST_Controller {
 
 		register_rest_route(
 			'wpagent/v1',
+			'/chat/stream',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'chat_stream' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			'wpagent/v1',
+			'/leads',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'capture_lead' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			'wpagent/v1',
 			'/chat/upload',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
@@ -232,26 +252,93 @@ class WPAgent_REST_Controller {
 				),
 			)
 		);
+
+		register_rest_route(
+			'wpagent/v1',
+			'/progress',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_progress' ),
+					'permission_callback' => array( $this, 'can_chat' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'save_progress' ),
+					'permission_callback' => array( $this, 'can_chat' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'wpagent/v1',
+			'/progress/reset',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'reset_progress' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			'wpagent/v1',
+			'/steps/generate-report',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_steps_report' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			'wpagent/v1',
+			'/ead/generate-syllabus',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_ead_syllabus' ),
+				'permission_callback' => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
+
+		register_rest_route(
+			'wpagent/v1',
+			'/ead/generate-lesson',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_ead_lesson' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
 	}
 
 	public function can_manage_conversations( ?WP_REST_Request $request = null ) {
+		if ( ! is_user_logged_in() ) {
+			return false;
+		}
+
 		if ( $request ) {
 			$agent_slug = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
 			$agent      = $this->agents->get_agent( $agent_slug );
+			if ( ! $this->user_can_access_agent( $agent ) ) {
+				return false;
+			}
 			if ( '1' === ( $agent['admin_assistant'] ?? '0' ) && ! current_user_can( 'manage_options' ) ) {
 				return false;
 			}
-			if ( '1' === ( $agent['allow_guest_chat'] ?? '0' ) ) {
-				return true;
-			}
 		}
 
-		return is_user_logged_in();
+		return true;
 	}
 
 	public function can_chat( WP_REST_Request $request ) {
 		$agent_slug = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
 		$agent      = $this->agents->get_agent( $agent_slug );
+
+		if ( ! $this->user_can_access_agent( $agent ) ) {
+			return false;
+		}
 
 		if ( '1' === ( $agent['admin_assistant'] ?? '0' ) ) {
 			return current_user_can( 'manage_options' );
@@ -261,7 +348,7 @@ class WPAgent_REST_Controller {
 			return true;
 		}
 
-		if ( '1' !== $agent['allow_guest_chat'] ) {
+		if ( '1' !== ( $agent['allow_guest_chat'] ?? '0' ) ) {
 			return false;
 		}
 
@@ -342,6 +429,161 @@ class WPAgent_REST_Controller {
 	}
 
 	public function chat( WP_REST_Request $request ) {
+		$result = $this->process_chat_request( $request );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	public function chat_stream( WP_REST_Request $request ) {
+		$result = $this->process_chat_request( $request );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		status_header( 200 );
+		header( 'Content-Type: text/event-stream; charset=utf-8' );
+		header( 'Cache-Control: no-cache, no-transform' );
+		header( 'X-Accel-Buffering: no' );
+
+		while ( ob_get_level() > 0 ) {
+			@ob_end_flush();
+		}
+
+		$reply  = (string) ( $result['reply'] ?? '' );
+		$tokens = preg_split( '/(\s+)/u', $reply, -1, PREG_SPLIT_DELIM_CAPTURE );
+		$buffer = '';
+
+		if ( is_array( $tokens ) ) {
+			$count = 0;
+			foreach ( $tokens as $token ) {
+				$buffer .= $token;
+				$count++;
+				if ( $count >= 6 ) {
+					echo 'data: ' . wp_json_encode( array( 'delta' => $buffer ) ) . "\n\n";
+					@flush();
+					$buffer = '';
+					$count  = 0;
+				}
+			}
+		}
+
+		if ( '' !== $buffer ) {
+			echo 'data: ' . wp_json_encode( array( 'delta' => $buffer ) ) . "\n\n";
+			@flush();
+		}
+
+		$done_payload         = $result;
+		$done_payload['done'] = true;
+		echo 'data: ' . wp_json_encode( $done_payload ) . "\n\n";
+		@flush();
+		exit;
+	}
+
+	public function capture_lead( WP_REST_Request $request ) {
+		$agent_slug      = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$agent           = $this->agents->get_agent( $agent_slug );
+		$name            = substr( sanitize_text_field( (string) ( $request->get_param( 'name' ) ?? '' ) ), 0, 190 );
+		$email           = sanitize_email( (string) ( $request->get_param( 'email' ) ?? '' ) );
+		$session_id      = sanitize_text_field( $request->get_param( 'session_id' ) ?: wp_generate_uuid4() );
+		$conversation_id = sanitize_text_field( $request->get_param( 'conversation_id' ) ?: '' );
+		$user_id         = get_current_user_id();
+
+		if ( '1' !== ( $agent['lead_capture_enabled'] ?? '0' ) ) {
+			return new WP_Error( 'wpagent_lead_disabled', __( 'A captura de leads está desativada para este agente.', 'wpagent' ), array( 'status' => 403 ) );
+		}
+
+		if ( '' === trim( $name ) ) {
+			return new WP_Error( 'wpagent_invalid_lead_name', __( 'Informe seu nome.', 'wpagent' ), array( 'status' => 400 ) );
+		}
+
+		if ( ! is_email( $email ) ) {
+			return new WP_Error( 'wpagent_invalid_lead_email', __( 'Informe um e-mail válido.', 'wpagent' ), array( 'status' => 400 ) );
+		}
+
+		if ( $user_id > 0 ) {
+			$this->repository->add_memory(
+				$user_id,
+				$agent['slug'],
+				sprintf( 'Lead identificado: %s (%s)', $name, $email ),
+				'lead',
+				null,
+				5
+			);
+		} else {
+			set_transient(
+				'wpagent_guest_lead_' . md5( $agent['slug'] . '|' . $session_id ),
+				array(
+					'name'  => $name,
+					'email' => $email,
+				),
+				7 * DAY_IN_SECONDS
+			);
+		}
+
+		$this->dispatch_webhook(
+			$agent,
+			'lead_captured',
+			array(
+				'name'            => $name,
+				'email'           => $email,
+				'user_id'         => $user_id,
+				'session_id'      => $session_id,
+				'conversation_id' => $conversation_id,
+			)
+		);
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'name'    => $name,
+				'email'   => $email,
+				'message' => __( 'Dados recebidos com sucesso.', 'wpagent' ),
+			)
+		);
+	}
+
+	private function dispatch_webhook( $agent, $event, $payload ) {
+		if ( '1' !== ( $agent['webhook_enabled'] ?? '0' ) ) {
+			return;
+		}
+
+		$url = esc_url_raw( $agent['webhook_url'] ?? '' );
+		if ( '' === $url || ! wp_http_validate_url( $url ) ) {
+			return;
+		}
+
+		$body = wp_json_encode(
+			array(
+				'plugin'    => '37agents',
+				'event'     => sanitize_key( $event ),
+				'timestamp' => current_time( 'c' ),
+				'site_url'  => home_url( '/' ),
+				'agent'     => array(
+					'slug' => $agent['slug'] ?? 'default',
+					'name' => $agent['name'] ?? '',
+				),
+				'payload'   => $payload,
+			)
+		);
+
+		wp_safe_remote_post(
+			$url,
+			array(
+				'blocking'    => false,
+				'timeout'     => 5,
+				'data_format' => 'body',
+				'headers'     => array(
+					'Content-Type' => 'application/json',
+				),
+				'body'        => $body,
+			)
+		);
+	}
+
+	private function process_chat_request( WP_REST_Request $request ) {
 		$message    = sanitize_textarea_field( $request->get_param( 'message' ) );
 		$agent      = $this->agents->get_agent( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
 		$agent_slug = $agent['slug'];
@@ -367,14 +609,29 @@ class WPAgent_REST_Controller {
 			$conversation_id = wp_generate_uuid4();
 		}
 
-		$conversation = $this->repository->get_conversation( $conversation_id, $user_id, $agent_slug );
+		$conversation    = $this->repository->get_conversation( $conversation_id, $user_id, $agent_slug );
+		$is_first_message = false;
+
+		if ( $conversation && 0 === $user_id ) {
+			$existing_interactions = $this->repository->get_conversation_interactions( $conversation_id, $agent_slug, 1 );
+			if ( ! empty( $existing_interactions ) && ( $existing_interactions[0]['session_id'] ?? '' ) !== $session_id ) {
+				$conversation_id = wp_generate_uuid4();
+				$conversation    = null;
+			}
+		}
+
 		if ( ! $conversation ) {
+			$existing_any = $this->repository->get_conversation_by_id( $conversation_id );
+			if ( $existing_any ) {
+				$conversation_id = wp_generate_uuid4();
+			}
 			$title = $this->conversation_title_from_message( $message );
 			if ( ! $user_id ) {
 				$title = sprintf( __( 'Visitante: %s', 'wpagent' ), $title );
 			}
-			$conversation = $this->repository->create_conversation( $user_id, $agent_slug, $title, $conversation_id, $project_id );
-		} elseif ( $project_id && ( empty( $conversation['project_id'] ) || absint( $conversation['project_id'] ) !== $project_id ) ) {
+			$conversation     = $this->repository->create_conversation( $user_id, $agent_slug, $title, $conversation_id, $user_id ? $project_id : null );
+			$is_first_message = true;
+		} elseif ( $user_id && $project_id && ( empty( $conversation['project_id'] ) || absint( $conversation['project_id'] ) !== $project_id ) ) {
 			$this->repository->update_conversation_project( $conversation_id, $user_id, $agent_slug, $project_id );
 			$conversation['project_id'] = $project_id;
 		}
@@ -429,17 +686,17 @@ class WPAgent_REST_Controller {
 
 		$interaction_id = $this->repository->record_interaction(
 			array(
-				'user_id'      => $user_id,
-				'agent_slug'   => $agent_slug,
+				'user_id'         => $user_id,
+				'agent_slug'      => $agent_slug,
 				'conversation_id' => $conversation_id,
-				'session_id'   => $session_id,
-				'message'      => $message,
-				'reply'        => $response['reply'],
-				'model'        => $response['model'],
-				'provider'     => $response['provider'],
-				'token_input'  => $response['token_input'],
-				'token_output' => $response['token_output'],
-				'metadata'     => array(
+				'session_id'      => $session_id,
+				'message'         => $message,
+				'reply'           => $response['reply'],
+				'model'           => $response['model'],
+				'provider'        => $response['provider'],
+				'token_input'     => $response['token_input'],
+				'token_output'    => $response['token_output'],
+				'metadata'        => array(
 					'ip_hash'                 => $this->client_ip_hash(),
 					'knowledge_used'          => ! empty( $response['knowledge'] ),
 					'knowledge_count'         => count( $response['knowledge'] ?? array() ),
@@ -462,35 +719,48 @@ class WPAgent_REST_Controller {
 			$this->repository->touch_conversation( $conversation_id, $user_id, $agent_slug );
 		}
 
+		if ( $is_first_message ) {
+			$guest_lead = 0 === $user_id ? get_transient( 'wpagent_guest_lead_' . md5( $agent_slug . '|' . $session_id ) ) : null;
+			$this->dispatch_webhook(
+				$agent,
+				'conversation_started',
+				array(
+					'conversation_id' => $conversation_id,
+					'session_id'      => $session_id,
+					'user_id'         => $user_id,
+					'first_message'   => $message,
+					'lead'            => is_array( $guest_lead ) ? $guest_lead : null,
+				)
+			);
+		}
+
 		$this->ai_client->maybe_extract_memory( $message, $response['reply'], $interaction_id, $user_id, $agent_slug );
 
-		$current_monthly = $this->repository->get_user_monthly_usage( $user_id );
-		$current_usage = (int) ( $current_monthly['total_tokens'] ?? 0 );
-		$global_limit = (int) $this->settings->get( 'global_token_limit', 100000 );
+		$current_monthly     = $this->repository->get_user_monthly_usage( $user_id );
+		$current_usage       = (int) ( $current_monthly['total_tokens'] ?? 0 );
+		$global_limit        = (int) $this->settings->get( 'global_token_limit', 100000 );
 		$enable_global_limit = '1' === $this->settings->get( 'enable_global_token_limit', '0' );
-		$monthly_limit = $enable_global_limit && ! current_user_can( 'manage_options' ) ? $global_limit : 0;
+		$monthly_limit       = $enable_global_limit && ! current_user_can( 'manage_options' ) ? $global_limit : 0;
 
-		return rest_ensure_response(
-			array(
-				'reply'             => $response['reply'],
-				'session_id'        => $session_id,
-				'conversation_id'   => $conversation_id,
-				'interaction_id'    => $interaction_id,
-				'provider'          => $response['provider'],
-				'model'             => $response['model'],
-				'knowledge_used'    => ! empty( $response['knowledge'] ),
-				'knowledge_sources' => $this->knowledge_sources_for_metadata( $response['knowledge'] ?? array() ),
-				'proposed_ability'  => $ability_proposal,
-				'proposed_email'    => $email_proposal,
-				'proposed_schedule' => $email_schedule_proposal,
-				'auto_confirmed'    => $auto_confirmed_schedule,
-				'token_usage'       => array(
-					'current_monthly' => $current_usage,
-					'monthly_limit' => $monthly_limit,
-					'enable_global_limit' => $enable_global_limit,
-					'remaining' => $monthly_limit > 0 ? max( 0, $monthly_limit - $current_usage ) : null,
-				),
-			)
+		return array(
+			'reply'             => $response['reply'],
+			'session_id'        => $session_id,
+			'conversation_id'   => $conversation_id,
+			'interaction_id'    => $interaction_id,
+			'provider'          => $response['provider'],
+			'model'             => $response['model'],
+			'knowledge_used'    => ! empty( $response['knowledge'] ),
+			'knowledge_sources' => $this->knowledge_sources_for_metadata( $response['knowledge'] ?? array() ),
+			'proposed_ability'  => $ability_proposal,
+			'proposed_email'    => $email_proposal,
+			'proposed_schedule' => $email_schedule_proposal,
+			'auto_confirmed'    => $auto_confirmed_schedule,
+			'token_usage'       => array(
+				'current_monthly'     => $current_usage,
+				'monthly_limit'       => $monthly_limit,
+				'enable_global_limit' => $enable_global_limit,
+				'remaining'           => $monthly_limit > 0 ? max( 0, $monthly_limit - $current_usage ) : null,
+			),
 		);
 	}
 
@@ -856,9 +1126,17 @@ class WPAgent_REST_Controller {
 			require_once ABSPATH . 'wp-admin/includes/image.php';
 		}
 
-		$allowed_exts = array( 'txt', 'md', 'csv', 'json', 'pdf', 'docx', 'html', 'htm' );
-		$filename     = sanitize_file_name( $file['name'] );
-		$ext          = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+		$allowed_mimes = array(
+			'txt'  => 'text/plain',
+			'md'   => 'text/plain',
+			'csv'  => 'text/csv',
+			'json' => 'application/json',
+			'pdf'  => 'application/pdf',
+			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		$allowed_exts  = array_keys( $allowed_mimes );
+		$filename      = sanitize_file_name( $file['name'] );
+		$ext           = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
 
 		if ( ! in_array( $ext, $allowed_exts, true ) ) {
 			return new WP_Error(
@@ -872,12 +1150,24 @@ class WPAgent_REST_Controller {
 			);
 		}
 
+		$checked_type = wp_check_filetype_and_ext( $file['tmp_name'], $filename, $allowed_mimes );
+		if ( empty( $checked_type['ext'] ) && ! in_array( $ext, array( 'txt', 'md', 'csv', 'json' ), true ) ) {
+			return new WP_Error(
+				'wpagent_invalid_file_mime',
+				__( 'O conteúdo do arquivo não corresponde a um formato permitido (TXT, MD, CSV, JSON, PDF ou DOCX).', 'wpagent' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		$max_size = (int) apply_filters( 'wpagent_frontend_upload_max_size', 10 * MB_IN_BYTES, $agent );
 		if ( $file['size'] > $max_size ) {
 			return new WP_Error( 'wpagent_file_too_large', __( 'O arquivo excede o tamanho máximo permitido.', 'wpagent' ), array( 'status' => 400 ) );
 		}
 
-		$upload_overrides = array( 'test_form' => false );
+		$upload_overrides = array(
+			'test_form' => false,
+			'mimes'     => $allowed_mimes,
+		);
 		$uploaded         = wp_handle_upload( $file, $upload_overrides );
 
 		if ( isset( $uploaded['error'] ) ) {
@@ -955,6 +1245,379 @@ class WPAgent_REST_Controller {
 					__( 'Documento "%s" indexado com sucesso e disponível neste atendimento!', 'wpagent' ),
 					$filename
 				),
+			)
+		);
+	}
+
+	public function get_progress( WP_REST_Request $request ) {
+		$agent_slug  = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$layout_type = sanitize_key( $request->get_param( 'layout_type' ) ?: 'steps' );
+		$session_id  = sanitize_text_field( $request->get_param( 'session_id' ) ?: '' );
+		$user_id     = get_current_user_id();
+
+		$progress = $this->repository->get_user_progress( $user_id, $agent_slug, $layout_type, $session_id );
+
+		return rest_ensure_response(
+			array(
+				'progress' => $progress ?: array(
+					'current_step'      => 0,
+					'completed_steps'   => array(),
+					'current_lesson'    => '',
+					'completed_lessons' => array(),
+					'final_report'      => '',
+					'status'            => 'in_progress',
+				),
+			)
+		);
+	}
+
+	public function save_progress( WP_REST_Request $request ) {
+		$agent_slug  = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$layout_type = sanitize_key( $request->get_param( 'layout_type' ) ?: 'steps' );
+		$session_id  = sanitize_text_field( $request->get_param( 'session_id' ) ?: '' );
+		$user_id     = get_current_user_id();
+
+		$payload = array(
+			'user_id'     => $user_id,
+			'session_id'  => $session_id,
+			'agent_slug'  => $agent_slug,
+			'layout_type' => $layout_type,
+		);
+
+		if ( null !== $request->get_param( 'current_step' ) ) {
+			$payload['current_step'] = absint( $request->get_param( 'current_step' ) );
+		}
+		if ( null !== $request->get_param( 'completed_steps' ) ) {
+			$raw_steps = $request->get_param( 'completed_steps' );
+			$clean_steps = array();
+			if ( is_array( $raw_steps ) ) {
+				foreach ( array_slice( $raw_steps, 0, 100, true ) as $step_key => $step_val ) {
+					$idx = absint( $step_key );
+					if ( is_array( $step_val ) ) {
+						$clean_steps[ $idx ] = array(
+							'step'     => absint( $step_val['step'] ?? ( $idx + 1 ) ),
+							'title'    => substr( sanitize_text_field( (string) ( $step_val['title'] ?? '' ) ), 0, 300 ),
+							'question' => substr( sanitize_text_field( (string) ( $step_val['question'] ?? '' ) ), 0, 1000 ),
+							'answer'   => substr( sanitize_textarea_field( (string) ( $step_val['answer'] ?? '' ) ), 0, 10000 ),
+						);
+					} else {
+						$clean_steps[ $idx ] = substr( sanitize_textarea_field( (string) $step_val ), 0, 10000 );
+					}
+				}
+			}
+			$payload['completed_steps'] = $clean_steps;
+		}
+		if ( null !== $request->get_param( 'current_lesson' ) ) {
+			$payload['current_lesson'] = substr( sanitize_text_field( (string) $request->get_param( 'current_lesson' ) ), 0, 120 );
+		}
+		if ( null !== $request->get_param( 'completed_lessons' ) ) {
+			$raw_lessons = $request->get_param( 'completed_lessons' );
+			$clean_lessons = array();
+			if ( is_array( $raw_lessons ) ) {
+				foreach ( array_slice( $raw_lessons, 0, 500 ) as $lesson_id ) {
+					$clean_id = substr( sanitize_text_field( (string) $lesson_id ), 0, 120 );
+					if ( '' !== $clean_id ) {
+						$clean_lessons[] = $clean_id;
+					}
+				}
+			}
+			$payload['completed_lessons'] = array_values( array_unique( $clean_lessons ) );
+		}
+		if ( null !== $request->get_param( 'final_report' ) ) {
+			$payload['final_report'] = wp_kses_post( substr( (string) $request->get_param( 'final_report' ), 0, 100000 ) );
+		}
+		if ( null !== $request->get_param( 'status' ) ) {
+			$status_val        = sanitize_key( $request->get_param( 'status' ) );
+			$payload['status'] = in_array( $status_val, array( 'in_progress', 'completed' ), true ) ? $status_val : 'in_progress';
+		}
+
+		$saved = $this->repository->save_user_progress( $payload );
+
+		return rest_ensure_response(
+			array(
+				'success'  => true,
+				'progress' => $saved,
+			)
+		);
+	}
+
+	public function reset_progress( WP_REST_Request $request ) {
+		$agent_slug  = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$layout_type = sanitize_key( $request->get_param( 'layout_type' ) ?: 'steps' );
+		$session_id  = sanitize_text_field( $request->get_param( 'session_id' ) ?: '' );
+		$user_id     = get_current_user_id();
+
+		$this->repository->reset_user_progress( $user_id, $agent_slug, $layout_type, $session_id );
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'message' => __( 'Progresso reiniciado com sucesso.', 'wpagent' ),
+			)
+		);
+	}
+
+	public function generate_steps_report( WP_REST_Request $request ) {
+		$agent_slug = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$answers    = $request->get_param( 'answers' );
+		$session_id = sanitize_text_field( $request->get_param( 'session_id' ) ?: '' );
+		$user_id    = get_current_user_id();
+
+		$agent = $this->agents->get_agent( $agent_slug );
+
+		$formatted_answers = '';
+		$sanitized_answers = array();
+		if ( is_array( $answers ) ) {
+			foreach ( array_slice( $answers, 0, 100, true ) as $idx => $ans ) {
+				$step_title = substr( sanitize_text_field( (string) ( $ans['title'] ?? ( __( 'Etapa', 'wpagent' ) . ' ' . ( absint( $idx ) + 1 ) ) ) ), 0, 300 );
+				$question   = substr( sanitize_text_field( (string) ( $ans['question'] ?? '' ) ), 0, 1000 );
+				$answer     = substr( sanitize_textarea_field( (string) ( $ans['answer'] ?? __( '[Etapa pulada / sem resposta]', 'wpagent' ) ) ), 0, 10000 );
+				$sanitized_answers[ absint( $idx ) ] = array(
+					'step'     => absint( $ans['step'] ?? ( absint( $idx ) + 1 ) ),
+					'title'    => $step_title,
+					'question' => $question,
+					'answer'   => $answer,
+				);
+				$formatted_answers .= sprintf( "### %s\n**Pergunta:** %s\n**Resposta do Usuário:** %s\n\n", $step_title, $question, $answer );
+			}
+		} elseif ( is_string( $answers ) ) {
+			$formatted_answers = substr( sanitize_textarea_field( $answers ), 0, 50000 );
+		}
+
+		$instructions = ! empty( $agent['steps_final_prompt'] )
+			? $agent['steps_final_prompt']
+			: __( 'Com base em todas as respostas fornecidas pelo usuário nas etapas anteriores, elabore um relatório final completo, estruturado, profissional e detalhado com plano de ação e recomendações práticas.', 'wpagent' );
+
+		$prompt = sprintf(
+			"Você é o agente \"%s\".\n\nDiretrizes do Agente:\n%s\n\nRespostas coletadas no questionário passo a passo:\n%s\n\nInstruções para o Relatório Final:\n%s\n\nPor favor, redija agora o Relatório Final formatado em Markdown rico (com títulos, tópicos, destaques e tabelas se aplicável). Não inclua preâmbulos desnecessários.",
+			$agent['name'],
+			$agent['system_prompt'],
+			$formatted_answers,
+			$instructions
+		);
+
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 180 );
+		}
+
+		try {
+			$response = $this->ai_client->chat(
+				$prompt,
+				$user_id,
+				$agent_slug,
+				'steps-report-' . ( $user_id ? $user_id : $session_id ),
+				$session_id,
+				null,
+				'steps-report'
+			);
+		} catch ( Throwable $throwable ) {
+			$response = new WP_Error( 'wpagent_steps_report_error', $throwable->getMessage(), array( 'status' => 500 ) );
+		}
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$report = is_array( $response ) ? ( $response['reply'] ?? '' ) : (string) $response;
+
+		// Save progress as completed with final report
+		$this->repository->save_user_progress(
+			array(
+				'user_id'         => $user_id,
+				'session_id'      => $session_id,
+				'agent_slug'      => $agent_slug,
+				'layout_type'     => 'steps',
+				'completed_steps' => $sanitized_answers,
+				'final_report'    => wp_kses_post( $report ),
+				'status'          => 'completed',
+			)
+		);
+
+		$guest_lead = 0 === $user_id ? get_transient( 'wpagent_guest_lead_' . md5( $agent_slug . '|' . $session_id ) ) : null;
+		$this->dispatch_webhook(
+			$agent,
+			'steps_report_generated',
+			array(
+				'user_id'    => $user_id,
+				'session_id' => $session_id,
+				'answers'    => $sanitized_answers,
+				'report'     => $report,
+				'lead'       => is_array( $guest_lead ) ? $guest_lead : null,
+			)
+		);
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'report'  => $report,
+			)
+		);
+	}
+
+	public function generate_ead_syllabus( WP_REST_Request $request ) {
+		$agent_slug   = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$course_title = sanitize_text_field( $request->get_param( 'course_title' ) ?: '' );
+		$manual_text  = sanitize_textarea_field( $request->get_param( 'manual_text' ) ?: '' );
+		$agent        = $this->agents->get_agent( $agent_slug );
+
+		if ( empty( $course_title ) ) {
+			$course_title = ! empty( $agent['ead_course_title'] ) ? $agent['ead_course_title'] : $agent['name'];
+		}
+
+		// Retrieve all indexed documents & training materials for this agent
+		$materials_text = $this->repository->get_agent_training_content_summary( $agent_slug, 45000 );
+
+		if ( ! empty( $manual_text ) ) {
+			$materials_text .= "\n\n### Material Didático Adicional Fornecido:\n" . $manual_text;
+		}
+
+		if ( empty( trim( $materials_text ) ) ) {
+			return new WP_Error(
+				'wpagent_no_materials',
+				__( 'Nenhum material didático ou documento foi encontrado na base deste agente. Por favor, anexe suas apostilas, PDFs ou textos na aba "Treinamentos" e salve o agente antes de gerar a ementa.', 'wpagent' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$system_instruction = "Você é um coordenador pedagógico e especialista sênior em design instrucional e criação de cursos EAD. Sua especialidade é analisar materiais didáticos, apostilas e documentos de treinamento para extrair uma estrutura curricular (ementa) completa, didática e perfeitamente ordenada em Módulos e Aulas.";
+
+		$user_prompt = sprintf(
+			"Analise detalhadamente o MATERIAL DIDÁTICO E DOCUMENTOS ANEXADOS abaixo e elabore a EMENTA COMPLETA de módulos e aulas para o curso \"%s\".\n\n" .
+			"DIRETRIZES FUNDAMENTAIS:\n" .
+			"1. Extraia os temas, capítulos, conceitos e tópicos DIRETAMENTE do material didático anexado. O curso deve ser totalmente fiel aos conteúdos reais do material.\n" .
+			"2. Agrupe os tópicos em Módulos lógicos sequenciais (ex.: Módulo 1, Módulo 2, etc.).\n" .
+			"3. Em cada módulo, liste as Aulas numeradas (ex.: Aula 1.1, Aula 1.2, Aula 2.1, etc.).\n" .
+			"4. Após o título de cada aula, adicione entre parênteses um resumo dos tópicos e conceitos-chave que serão tratados nela.\n" .
+			"5. Retorne EXCLUSIVAMENTE a lista formatada no padrão abaixo, sem saudações, sem explicações antes ou depois e sem blocos de código Markdown:\n\n" .
+			"Módulo 1: Nome do Módulo\n" .
+			"Aula 1.1: Título da Aula (Tópico 1; Tópico 2; Tópico 3)\n" .
+			"Aula 1.2: Título da Aula (Tópico 4; Tópico 5)\n\n" .
+			"Módulo 2: Nome do Módulo\n" .
+			"Aula 2.1: Título da Aula (Tópico 6; Tópico 7)\n" .
+			"Aula 2.2: Título da Aula (Tópico 8; Tópico 9)\n\n" .
+			"--- MATERIAL DIDÁTICO E DOCUMENTOS ANEXADOS ---\n%s\n--- FIM DO MATERIAL DIDÁTICO ---",
+			$course_title,
+			trim( $materials_text )
+		);
+
+		try {
+			$response = $this->ai_client->raw_prompt(
+				$user_prompt,
+				$agent_slug,
+				$system_instruction
+			);
+		} catch ( Throwable $throwable ) {
+			return new WP_Error( 'wpagent_syllabus_error', $throwable->getMessage(), array( 'status' => 500 ) );
+		}
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$raw_reply = is_array( $response ) ? ( $response['reply'] ?? '' ) : (string) $response;
+		$clean_syllabus = trim( $raw_reply );
+
+		// Strip markdown code fences if present
+		$clean_syllabus = preg_replace( '/^```[a-z0-9_-]*\s*/i', '', $clean_syllabus );
+		$clean_syllabus = preg_replace( '/\s*```$/', '', $clean_syllabus );
+		$clean_syllabus = trim( $clean_syllabus );
+
+		return rest_ensure_response(
+			array(
+				'success'  => true,
+				'syllabus' => $clean_syllabus,
+			)
+		);
+	}
+
+	public function generate_ead_lesson( WP_REST_Request $request ) {
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 180 );
+		}
+
+		$agent_slug       = sanitize_key( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		$module_title     = sanitize_text_field( $request->get_param( 'module_title' ) ?: '' );
+		$lesson_title     = sanitize_text_field( $request->get_param( 'lesson_title' ) ?: '' );
+		$force_regenerate = ! empty( $request->get_param( 'force_regenerate' ) );
+		$user_id          = get_current_user_id();
+		$session_id       = sanitize_text_field( $request->get_param( 'session_id' ) ?: '' );
+
+		if ( $force_regenerate && ! current_user_can( 'edit_posts' ) && ! current_user_can( 'manage_options' ) ) {
+			return new WP_Error(
+				'wpagent_forbidden_regenerate',
+				__( 'Apenas administradores ou editores podem regerar o conteúdo das aulas.', 'wpagent' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		$lesson_key = md5( $module_title . '|' . $lesson_title );
+
+		// Check if lesson content is already generated and cached in DB
+		if ( ! $force_regenerate ) {
+			$cached_lesson = $this->repository->get_ead_lesson( $agent_slug, $lesson_key );
+			if ( $cached_lesson && ! empty( $cached_lesson['content'] ) ) {
+				return rest_ensure_response(
+					array(
+						'success' => true,
+						'cached'  => true,
+						'content' => $cached_lesson['content'],
+					)
+				);
+			}
+		}
+
+		$agent = $this->agents->get_agent( $agent_slug );
+
+		// Retrieve relevant training chunks for this specific lesson
+		$relevant_chunks = $this->repository->search_training_chunks( $agent_slug, $module_title . ' ' . $lesson_title, 6 );
+		$chunks_context = '';
+		if ( ! empty( $relevant_chunks ) ) {
+			$chunks_context = "\n\n--- TRECHOS RELEVANTES DO MATERIAL DIDÁTICO ---\n";
+			foreach ( $relevant_chunks as $c ) {
+				$heading_label   = ! empty( $c['heading'] ) ? "[{$c['heading']}]: " : "";
+				$chunks_context .= "- " . $heading_label . $c['content'] . "\n\n";
+			}
+			$chunks_context .= "--- FIM DOS TRECHOS DO MATERIAL ---\n" .
+				"Baseie a explicação teórica, conceitos e exemplos rigorosamente nos trechos acima.";
+		}
+
+		$prompt = sprintf(
+			"Você é o instrutor do curso \"%s\".\n\nEscreva o CONTEÚDO COMPLETO e DIDÁTICO para a seguinte aula:\n- Módulo: %s\n- Aula: %s\n\nO texto da aula deve ser estruturado em Markdown com:\n1. 🎯 Objetivos da Aula\n2. 📖 Conteúdo Teórico e Explicação Detalhada\n3. 💡 Exemplos Práticos e Dicas\n4. 📝 Resumo dos Pontos-Chave\n\nUtilize a base de conhecimento e diretrizes do agente para redigir o conteúdo mais preciso possível. Responda diretamente com o conteúdo da aula formatado.%s",
+			! empty( $agent['ead_course_title'] ) ? $agent['ead_course_title'] : $agent['name'],
+			$module_title,
+			$lesson_title,
+			$chunks_context
+		);
+
+		try {
+			$response = $this->ai_client->chat(
+				$prompt,
+				$user_id,
+				$agent_slug,
+				'ead-lesson-' . $lesson_key,
+				$session_id,
+				null,
+				'ead-lesson'
+			);
+		} catch ( Throwable $throwable ) {
+			return new WP_Error( 'wpagent_lesson_error', $throwable->getMessage(), array( 'status' => 500 ) );
+		}
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$content = is_array( $response ) ? ( $response['reply'] ?? '' ) : (string) $response;
+		$clean_content = trim( $content );
+
+		// Save permanently to database for instant future retrieval
+		$this->repository->save_ead_lesson( $agent_slug, $lesson_key, $module_title, $lesson_title, $clean_content );
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'cached'  => false,
+				'content' => $clean_content,
 			)
 		);
 	}

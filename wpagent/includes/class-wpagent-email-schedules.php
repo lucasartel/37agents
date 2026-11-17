@@ -115,7 +115,17 @@ class WPAgent_Email_Schedules {
 	}
 
 	public function extract_schedule_proposal( $reply, $agent, $context = array() ) {
-		$clean_reply = trim( preg_replace( '/```wpagent-email-schedule\s*[\s\S]*?\s*```/s', '', (string) $reply ) );
+		$raw = (string) $reply;
+		$json_str = null;
+		$clean_reply = $raw;
+
+		if ( preg_match( '/```wpagent-email-schedule\s*([\s\S]*?)(?:```|$)/s', $raw, $matches ) ) {
+			$json_str    = trim( $matches[1] );
+			$clean_reply = trim( preg_replace( '/```wpagent-email-schedule\s*[\s\S]*?(?:```|$)/s', '', $raw ) );
+		} elseif ( preg_match( '/\[wpagent-email-schedule\]\s*([\s\S]*?)(?:\[\/wpagent-email-schedule\]|$)/s', $raw, $matches ) ) {
+			$json_str    = trim( $matches[1] );
+			$clean_reply = trim( preg_replace( '/\[wpagent-email-schedule\]\s*[\s\S]*?(?:\[\/wpagent-email-schedule\]|$)/s', '', $raw ) );
+		}
 
 		if ( ! $this->enabled_for_agent( $agent ) ) {
 			return array(
@@ -124,11 +134,19 @@ class WPAgent_Email_Schedules {
 			);
 		}
 
-		if ( ! preg_match( '/```wpagent-email-schedule\s*([\s\S]*?)\s*```/s', (string) $reply, $matches ) ) {
+		if ( empty( $json_str ) ) {
 			return null;
 		}
 
-		$data = json_decode( trim( $matches[1] ), true );
+		$data = json_decode( $json_str, true );
+		if ( ! is_array( $data ) ) {
+			$start = strpos( $json_str, '{' );
+			$end   = strrpos( $json_str, '}' );
+			if ( false !== $start && false !== $end && $end > $start ) {
+				$data = json_decode( substr( $json_str, $start, $end - $start + 1 ), true );
+			}
+		}
+
 		if ( ! is_array( $data ) ) {
 			return array(
 				'reply'    => $clean_reply,

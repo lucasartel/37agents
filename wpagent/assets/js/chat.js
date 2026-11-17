@@ -159,6 +159,9 @@
 			userProfileEnabled: chat.getAttribute('data-user-profile-enabled') === '1',
 			requestTimeoutMs: Math.max(30000, Number(chat.getAttribute('data-request-timeout')) || 105000),
 			uploadUrl: chat.getAttribute('data-upload-url') || '',
+			streamUrl: chat.getAttribute('data-stream-url') || '',
+			leadsUrl: chat.getAttribute('data-leads-url') || '',
+			leadCaptureEnabled: chat.getAttribute('data-lead-capture-enabled') === '1',
 			enableFrontendUploads: chat.getAttribute('data-enable-frontend-uploads') === '1',
 			showTokenUsage: chat.getAttribute('data-show-token-usage') === '1',
 			defaultTheme: chat.getAttribute('data-default-theme') === 'dark' ? 'dark' : 'light'
@@ -209,6 +212,99 @@
 			if (profileStatus) {
 				profileStatus.textContent = text;
 			}
+		}
+
+		function openDialog(opts) {
+			return new Promise(function (resolve) {
+				var backdrop = document.createElement('div');
+				backdrop.className = 'wpagent-chat__dialog-backdrop';
+
+				var box = document.createElement('div');
+				box.className = 'wpagent-chat__dialog';
+				box.setAttribute('role', 'dialog');
+				box.setAttribute('aria-modal', 'true');
+
+				var heading = document.createElement('h4');
+				heading.textContent = opts.title || '';
+				box.appendChild(heading);
+
+				if (opts.message) {
+					var desc = document.createElement('p');
+					desc.textContent = opts.message;
+					box.appendChild(desc);
+				}
+
+				var inputEl = null;
+				if (opts.isPrompt) {
+					inputEl = document.createElement('input');
+					inputEl.type = 'text';
+					inputEl.className = 'wpagent-chat__dialog-input';
+					inputEl.value = opts.defaultValue || '';
+					inputEl.placeholder = opts.placeholder || '';
+					box.appendChild(inputEl);
+				}
+
+				var actions = document.createElement('div');
+				actions.className = 'wpagent-chat__dialog-actions';
+
+				var cancelBtn = document.createElement('button');
+				cancelBtn.type = 'button';
+				cancelBtn.className = 'wpagent-chat__dialog-btn';
+				cancelBtn.textContent = opts.cancelLabel || t('cancel', 'Cancelar');
+
+				var confirmBtn = document.createElement('button');
+				confirmBtn.type = 'button';
+				confirmBtn.className = 'wpagent-chat__dialog-btn wpagent-chat__dialog-btn--primary' + (opts.isDanger ? ' is-danger' : '');
+				confirmBtn.textContent = opts.confirmLabel || t('confirm', 'Confirmar');
+
+				actions.appendChild(cancelBtn);
+				actions.appendChild(confirmBtn);
+				box.appendChild(actions);
+				backdrop.appendChild(box);
+				chat.appendChild(backdrop);
+
+				function close(result) {
+					if (backdrop.parentNode) {
+						backdrop.parentNode.removeChild(backdrop);
+					}
+					resolve(result);
+				}
+
+				cancelBtn.addEventListener('click', function () {
+					close(opts.isPrompt ? null : false);
+				});
+
+				confirmBtn.addEventListener('click', function () {
+					if (opts.isPrompt) {
+						close(inputEl ? inputEl.value : '');
+					} else {
+						close(true);
+					}
+				});
+
+				backdrop.addEventListener('click', function (e) {
+					if (e.target === backdrop) {
+						close(opts.isPrompt ? null : false);
+					}
+				});
+
+				box.addEventListener('keydown', function (e) {
+					if (e.key === 'Escape') {
+						e.preventDefault();
+						close(opts.isPrompt ? null : false);
+					} else if (e.key === 'Enter' && opts.isPrompt) {
+						e.preventDefault();
+						close(inputEl ? inputEl.value : '');
+					}
+				});
+
+				if (inputEl) {
+					inputEl.focus();
+					inputEl.select();
+				} else {
+					confirmBtn.focus();
+				}
+			});
 		}
 
 		function setEmpty() {
@@ -498,9 +594,9 @@
 
 		function stripProposalBlocks(text) {
 			return String(text || '')
-				.replace(/```wpagent-email-schedule[\s\S]*?```/gi, '')
-				.replace(/```wpagent-email[\s\S]*?```/gi, '')
-				.replace(/```wpagent-ability[\s\S]*?```/gi, '')
+				.replace(/```(?:wpagent-email-schedule|wpagent-email|wpagent-ability|wpagent-action)[\s\S]*?(?:```|$)/gi, '')
+				.replace(/\[(?:wpagent-email-schedule|wpagent-email|wpagent-ability|wpagent-action)\][\s\S]*?(?:\[\/(?:wpagent-email-schedule|wpagent-email|wpagent-ability|wpagent-action)\]|$)/gi, '')
+				.replace(/<(?:wpagent-email-schedule|wpagent-email|wpagent-ability|wpagent-action)>[\s\S]*?(?:<\/(?:wpagent-email-schedule|wpagent-email|wpagent-ability|wpagent-action)>|$)/gi, '')
 				.trim();
 		}
 
@@ -609,7 +705,13 @@
 			html = html.replace(/`([^`]+)`/g, '<code class="wpagent-md__code">$1</code>');
 			html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 			html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
-			html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+			html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (match, label, rawUrl) {
+				var cleanUrl = String(rawUrl || '').trim();
+				if (/^(https?:\/\/|mailto:|\/(?!\/))/i.test(cleanUrl)) {
+					return '<a href="' + cleanUrl.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+				}
+				return label;
+			});
 
 			var paragraphs = html.split(/\n{2,}/);
 			for (var p = 0; p < paragraphs.length; p++) {
@@ -798,29 +900,34 @@
 			button.textContent = t('runAbility', 'Executar acao');
 
 			button.addEventListener('click', function () {
-				if (!window.confirm(t('confirmAbility', 'Executar esta acao no WordPress?'))) {
-					return;
-				}
+				openDialog({
+					title: t('abilityProposal', 'Acao proposta'),
+					message: t('confirmAbility', 'Executar esta acao no WordPress?')
+				}).then(function (confirmed) {
+					if (!confirmed) {
+						return;
+					}
 
-				button.disabled = true;
-				setStatus(t('runningAbility', 'Executando acao...'));
-				request(config, config.abilitiesUrl, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						agent_slug: agent,
-						ability: proposal.ability,
-						input: proposal.input || {}
-					})
-				}).then(function (body) {
-					card.classList.add('is-executed');
-					button.textContent = t('abilityExecuted', 'Acao executada');
-					setStatus(t('abilityExecuted', 'Acao executada'));
-					addMessage('agent', formatAbilityResult(body));
-				}).catch(function (error) {
-					button.disabled = false;
-					setStatus(t('abilityError', 'Erro ao executar acao'));
-					addMessage('agent', error.message, 'wpagent-chat__message--error');
+					button.disabled = true;
+					setStatus(t('runningAbility', 'Executando acao...'));
+					request(config, config.abilitiesUrl, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							agent_slug: agent,
+							ability: proposal.ability,
+							input: proposal.input || {}
+						})
+					}).then(function (body) {
+						card.classList.add('is-executed');
+						button.textContent = t('abilityExecuted', 'Acao executada');
+						setStatus(t('abilityExecuted', 'Acao executada'));
+						addMessage('agent', formatAbilityResult(body));
+					}).catch(function (error) {
+						button.disabled = false;
+						setStatus(t('abilityError', 'Erro ao executar acao'));
+						addMessage('agent', error.message, 'wpagent-chat__message--error');
+					});
 				});
 			});
 
@@ -850,31 +957,36 @@
 			button.textContent = t('sendEmail', 'Enviar email');
 
 			button.addEventListener('click', function () {
-				if (!window.confirm(t('confirmEmail', 'Enviar este email agora?'))) {
-					return;
-				}
+				openDialog({
+					title: t('emailProposal', 'Email preparado'),
+					message: t('confirmEmail', 'Enviar este email agora?')
+				}).then(function (confirmed) {
+					if (!confirmed) {
+						return;
+					}
 
-				button.disabled = true;
-				setStatus(t('sendingEmail', 'Enviando email...'));
-				request(config, config.emailActionsUrl, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						agent_slug: agent,
-						proposal: proposal,
-						session_id: sessionId,
-						conversation_id: conversationId,
-						interaction_id: body && body.interaction_id ? body.interaction_id : 0
-					})
-				}).then(function (result) {
-					card.classList.add('is-executed');
-					button.textContent = t('emailQueued', 'Email agendado');
-					setStatus(t('emailQueued', 'Email agendado'));
-					addMessage('agent', formatEmailResult(result));
-				}).catch(function (error) {
-					button.disabled = false;
-					setStatus(t('emailError', 'Erro ao enviar email'));
-					addMessage('agent', error.message, 'wpagent-chat__message--error');
+					button.disabled = true;
+					setStatus(t('sendingEmail', 'Enviando email...'));
+					request(config, config.emailActionsUrl, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							agent_slug: agent,
+							proposal: proposal,
+							session_id: sessionId,
+							conversation_id: conversationId,
+							interaction_id: body && body.interaction_id ? body.interaction_id : 0
+						})
+					}).then(function (result) {
+						card.classList.add('is-executed');
+						button.textContent = t('emailQueued', 'Email agendado');
+						setStatus(t('emailQueued', 'Email agendado'));
+						addMessage('agent', formatEmailResult(result));
+					}).catch(function (error) {
+						button.disabled = false;
+						setStatus(t('emailError', 'Erro ao enviar email'));
+						addMessage('agent', error.message, 'wpagent-chat__message--error');
+					});
 				});
 			});
 
@@ -1184,7 +1296,8 @@
 				deleteButton.type = 'button';
 				deleteButton.className = 'wpagent-chat__delete-conversation';
 				deleteButton.setAttribute('aria-label', t('deleteConversation', 'Apagar conversa ') + label);
-				deleteButton.textContent = 'x';
+				deleteButton.setAttribute('title', t('deleteConversation', 'Apagar conversa'));
+				deleteButton.textContent = '✕';
 				deleteButton.addEventListener('click', function () {
 					deleteConversation(conversation.conversation_id, label);
 				});
@@ -1293,26 +1406,32 @@
 			}
 
 			var current = title.textContent || t('conversation', 'Conversa');
-			var next = window.prompt(t('renamePrompt', 'Nome da conversa'), current);
-			if (!next || !next.trim()) {
-				return;
-			}
+			openDialog({
+				title: t('renamePrompt', 'Nome da conversa'),
+				isPrompt: true,
+				defaultValue: current,
+				confirmLabel: t('save', 'Salvar')
+			}).then(function (next) {
+				if (!next || !next.trim()) {
+					return;
+				}
 
-			setStatus(t('renaming', 'Renomeando conversa...'));
-			request(config, config.conversationsUrl + '/' + encodeURIComponent(conversationId), {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					agent_slug: agent,
-					title: next.trim()
-				})
-			}).then(function (body) {
-				title.textContent = body.conversation.title;
-				setStatus(t('renamed', 'Conversa renomeada'));
-				return loadConversations();
-			}).catch(function (error) {
-				setStatus(t('renameError', 'Erro ao renomear conversa'));
-				addMessage('agent', error.message);
+				setStatus(t('renaming', 'Renomeando conversa...'));
+				request(config, config.conversationsUrl + '/' + encodeURIComponent(conversationId), {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						agent_slug: agent,
+						title: next.trim()
+					})
+				}).then(function (body) {
+					title.textContent = body.conversation.title;
+					setStatus(t('renamed', 'Conversa renomeada'));
+					return loadConversations();
+				}).catch(function (error) {
+					setStatus(t('renameError', 'Erro ao renomear conversa'));
+					addMessage('agent', error.message);
+				});
 			});
 		}
 
@@ -1321,34 +1440,41 @@
 				return;
 			}
 
-			if (!window.confirm(t('deleteConfirmBefore', 'Apagar a conversa "') + label + t('deleteConfirmAfter', '"?'))) {
-				return;
-			}
+			openDialog({
+				title: t('deleteConversation', 'Apagar conversa'),
+				message: t('deleteConfirmBefore', 'Apagar a conversa "') + label + t('deleteConfirmAfter', '"?'),
+				confirmLabel: t('delete', 'Apagar'),
+				isDanger: true
+			}).then(function (confirmed) {
+				if (!confirmed) {
+					return;
+				}
 
-			setStatus(t('deleting', 'Apagando conversa...'));
-			request(config, config.conversationsUrl + '/' + encodeURIComponent(id) + '/delete', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					agent_slug: agent
-				})
-			}).then(function () {
-				if (conversationId === id) {
-					conversationId = '';
-					title.textContent = t('newConversation', 'Nova conversa');
-					setEmpty();
-				}
-				conversations = conversations.filter(function (conversation) {
-					return conversation.conversation_id !== id;
+				setStatus(t('deleting', 'Apagando conversa...'));
+				request(config, config.conversationsUrl + '/' + encodeURIComponent(id) + '/delete', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						agent_slug: agent
+					})
+				}).then(function () {
+					if (conversationId === id) {
+						conversationId = '';
+						title.textContent = t('newConversation', 'Nova conversa');
+						setEmpty();
+					}
+					conversations = conversations.filter(function (conversation) {
+						return conversation.conversation_id !== id;
+					});
+					renderConversations();
+					setStatus(t('deleted', 'Conversa apagada'));
+					if (!conversationId && conversations.length) {
+						return selectConversation(conversations[0].conversation_id, conversations[0].title);
+					}
+				}).catch(function (error) {
+					setStatus(t('deleteError', 'Erro ao apagar conversa'));
+					addMessage('agent', error.message);
 				});
-				renderConversations();
-				setStatus(t('deleted', 'Conversa apagada'));
-				if (!conversationId && conversations.length) {
-					return selectConversation(conversations[0].conversation_id, conversations[0].title);
-				}
-			}).catch(function (error) {
-				setStatus(t('deleteError', 'Erro ao apagar conversa'));
-				addMessage('agent', error.message);
 			});
 		}
 
@@ -1426,7 +1552,7 @@
 		var addProjectButton = chat.querySelector('[data-wpagent-add-project]');
 
 		function loadProjects() {
-			if (!config.enableProjects || !config.projectsUrl) {
+			if (!config.isLoggedIn || !config.enableProjects || !config.projectsUrl) {
 				return Promise.resolve();
 			}
 
@@ -1501,70 +1627,89 @@
 			}
 
 			var defaultName = t('newProjectDefault', 'Novo Projeto');
-			var name = window.prompt(t('newProjectPrompt', 'Nome da nova aba / projeto:'), defaultName);
-			if (!name || !name.trim()) return;
+			openDialog({
+				title: t('newProjectPrompt', 'Nome da nova aba / projeto:'),
+				isPrompt: true,
+				defaultValue: defaultName,
+				confirmLabel: t('create', 'Criar')
+			}).then(function (name) {
+				if (!name || !name.trim()) return;
 
-			setStatus(t('creatingProject', 'Criando nova aba...'));
-			request(config, config.projectsUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					agent_slug: agent,
-					name: name.trim()
-				})
-			}).then(function (body) {
-				if (body && body.project) {
-					projects.push(body.project);
-					activeProjectId = body.project.id;
-					conversationId = '';
-					setEmpty();
-					renderProjects();
-					loadConversations();
-					loadProjectProfile();
-					setStatus(t('ready', 'Pronto para conversar'));
-				} else {
-					setStatus(t('createProjectError', 'Erro ao criar aba'));
-				}
-			}).catch(function (error) {
-				setStatus(error.message || t('createProjectError', 'Erro ao criar aba'));
+				setStatus(t('creatingProject', 'Criando nova aba...'));
+				request(config, config.projectsUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						agent_slug: agent,
+						name: name.trim()
+					})
+				}).then(function (body) {
+					if (body && body.project) {
+						projects.push(body.project);
+						activeProjectId = body.project.id;
+						conversationId = '';
+						setEmpty();
+						renderProjects();
+						loadConversations();
+						loadProjectProfile();
+						setStatus(t('ready', 'Pronto para conversar'));
+					} else {
+						setStatus(t('createProjectError', 'Erro ao criar aba'));
+					}
+				}).catch(function (error) {
+					setStatus(error.message || t('createProjectError', 'Erro ao criar aba'));
+				});
 			});
 		}
 
 		function renameProject(id, currentName) {
-			var newName = window.prompt(t('renameProjectPrompt', 'Novo nome do projeto:'), currentName);
-			if (!newName || !newName.trim() || newName.trim() === currentName) return;
+			openDialog({
+				title: t('renameProjectPrompt', 'Novo nome do projeto:'),
+				isPrompt: true,
+				defaultValue: currentName,
+				confirmLabel: t('save', 'Salvar')
+			}).then(function (newName) {
+				if (!newName || !newName.trim() || newName.trim() === currentName) return;
 
-			request(config, config.projectsUrl + '/' + id, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					agent_slug: agent,
-					name: newName.trim()
-				})
-			}).then(function (body) {
-				if (body.project) {
-					var idx = projects.findIndex(function (p) { return p.id == id; });
-					if (idx !== -1) projects[idx] = body.project;
-					renderProjects();
-				}
+				request(config, config.projectsUrl + '/' + id, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						agent_slug: agent,
+						name: newName.trim()
+					})
+				}).then(function (body) {
+					if (body.project) {
+						var idx = projects.findIndex(function (p) { return p.id == id; });
+						if (idx !== -1) projects[idx] = body.project;
+						renderProjects();
+					}
+				});
 			});
 		}
 
 		function deleteProject(id, name) {
-			if (!window.confirm(t('confirmDeleteProject', 'Deseja excluir a aba "' + name + '"? As conversas dela serao desvinculadas.'))) return;
+			openDialog({
+				title: t('deleteProject', 'Excluir aba'),
+				message: t('confirmDeleteProject', 'Deseja excluir a aba "' + name + '"? As conversas dela serao desvinculadas.'),
+				confirmLabel: t('delete', 'Excluir'),
+				isDanger: true
+			}).then(function (confirmed) {
+				if (!confirmed) return;
 
-			request(config, config.projectsUrl + '/' + id + '?agent_slug=' + encodeURIComponent(agent), {
-				method: 'DELETE'
-			}).then(function () {
-				projects = projects.filter(function (p) { return p.id != id; });
-				if (activeProjectId == id) {
-					activeProjectId = projects[0] ? projects[0].id : null;
-					conversationId = '';
-					setEmpty();
-					loadConversations();
-					loadProjectProfile();
-				}
-				renderProjects();
+				request(config, config.projectsUrl + '/' + id + '?agent_slug=' + encodeURIComponent(agent), {
+					method: 'DELETE'
+				}).then(function () {
+					projects = projects.filter(function (p) { return p.id != id; });
+					if (activeProjectId == id) {
+						activeProjectId = projects[0] ? projects[0].id : null;
+						conversationId = '';
+						setEmpty();
+						loadConversations();
+						loadProjectProfile();
+					}
+					renderProjects();
+				});
 			});
 		}
 
@@ -1614,6 +1759,169 @@
 			textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
 		}
 
+		function parseSseBuffer(buffer, flushAll, onEvent) {
+			var lines = buffer.split(/\r?\n/);
+			var remainder = flushAll ? '' : (lines.pop() || '');
+			var i;
+			for (i = 0; i < lines.length; i += 1) {
+				var line = lines[i].trim();
+				if (!line || line.indexOf('data:') !== 0) {
+					continue;
+				}
+				var raw = line.slice(5).trim();
+				if (!raw || raw === '[DONE]') {
+					continue;
+				}
+				var evt = null;
+				try {
+					evt = JSON.parse(raw);
+				} catch (parseErr) {
+					evt = null;
+				}
+				if (evt) {
+					onEvent(evt);
+				}
+			}
+			return remainder;
+		}
+
+		function streamChatRequest(payload, onDelta) {
+			var controller = window.AbortController ? new AbortController() : null;
+			var timer = null;
+			var resetTimer = function () {
+				if (timer) {
+					window.clearTimeout(timer);
+					timer = null;
+				}
+				if (controller) {
+					timer = window.setTimeout(function () {
+						controller.abort();
+					}, config.requestTimeoutMs);
+				}
+			};
+			var clearTimer = function () {
+				if (timer) {
+					window.clearTimeout(timer);
+					timer = null;
+				}
+			};
+			var jsonFallback = function () {
+				return request(config, config.restUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				});
+			};
+
+			resetTimer();
+			return fetch(config.streamUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json',
+					'Accept': 'text/event-stream',
+					'X-WP-Nonce': config.nonce
+				},
+				body: JSON.stringify(payload),
+				signal: controller ? controller.signal : undefined
+			}).then(function (response) {
+				if (response.status === 404 || response.status === 405) {
+					clearTimer();
+					return jsonFallback();
+				}
+
+				if (!response.ok) {
+					clearTimer();
+					return response.text().then(function (text) {
+						var body = {};
+						var isHtml = responseLooksHtml(response, text);
+						if (text && !isHtml) {
+							try {
+								body = JSON.parse(text);
+							} catch (err) {
+								body = { message: compactErrorText(text) };
+							}
+						}
+						throw new Error(responseErrorMessage(config, response, body, text, isHtml));
+					});
+				}
+
+				var contentType = response.headers && response.headers.get ? (response.headers.get('content-type') || '') : '';
+				if (contentType.indexOf('application/json') !== -1) {
+					clearTimer();
+					return response.text().then(function (text) {
+						if (responseLooksHtml(response, text)) {
+							throw new Error(t('invalidServerResponse', 'O servidor retornou uma página de erro em vez de uma resposta do 37agents. Tente novamente em instantes.'));
+						}
+						return text ? JSON.parse(text) : {};
+					});
+				}
+
+				if (responseLooksHtml(response, '')) {
+					clearTimer();
+					throw new Error(t('invalidServerResponse', 'O servidor retornou uma página de erro em vez de uma resposta do 37agents. Tente novamente em instantes.'));
+				}
+
+				if (!response.body || !response.body.getReader || !window.TextDecoder) {
+					clearTimer();
+					throw new Error(t('invalidServerResponse', 'Streaming não suportado neste navegador.'));
+				}
+
+				var reader = response.body.getReader();
+				var decoder = new window.TextDecoder('utf-8');
+				var sseBuffer = '';
+				var accumulated = '';
+				var finalPayload = null;
+				var handleEvent = function (evt) {
+					if (evt.error) {
+						throw new Error(typeof evt.error === 'string' ? evt.error : (evt.message || t('replyError', 'Erro ao responder')));
+					}
+					if (evt.code && evt.message && !evt.delta && !evt.reply && !evt.done) {
+						throw new Error(evt.message);
+					}
+					if (typeof evt.delta === 'string' && evt.delta) {
+						accumulated += evt.delta;
+						onDelta(accumulated);
+					}
+					if (evt.done || typeof evt.reply === 'string') {
+						finalPayload = evt;
+					}
+				};
+
+				function pump() {
+					return reader.read().then(function (result) {
+						resetTimer();
+						if (result.done) {
+							clearTimer();
+							sseBuffer += decoder.decode();
+							sseBuffer = parseSseBuffer(sseBuffer, true, handleEvent);
+							if (finalPayload) {
+								if (!finalPayload.reply && accumulated) {
+									finalPayload.reply = accumulated;
+								}
+								return finalPayload;
+							}
+							if (accumulated) {
+								return { reply: accumulated };
+							}
+							throw new Error(t('invalidServerResponse', 'O servidor retornou uma resposta vazia. Tente novamente em instantes.'));
+						}
+						sseBuffer += decoder.decode(result.value, { stream: true });
+						sseBuffer = parseSseBuffer(sseBuffer, false, handleEvent);
+						return pump();
+					});
+				}
+
+				return pump();
+			}).catch(function (error) {
+				clearTimer();
+				if (error && error.name === 'AbortError') {
+					throw new Error(t('browserTimeoutError', 'A resposta excedeu o tempo de espera do navegador. Tente novamente em instantes.'));
+				}
+				throw error;
+			});
+		}
+
 		function sendMessage() {
 			var message = textarea.value.trim();
 			if (!message || submitButton.disabled) {
@@ -1628,26 +1936,69 @@
 			setStatus(t('processingReply', 'Processando resposta...'));
 
 			if (!config.restUrl || !config.nonce) {
-				markError(pending, t('configMissing', 'Configuracao do WPAgent nao encontrada nesta pagina. Atualize a pagina e tente novamente.'));
+				markError(pending, t('configMissing', 'Configuracao do 37agents nao encontrada nesta pagina. Atualize a pagina e tente novamente.'));
 				submitButton.disabled = false;
 				setStatus(t('configError', 'Erro de configuracao'));
 				return;
 			}
 
-			request(config, config.restUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					message: message,
-					agent_slug: agent,
-					session_id: sessionId,
-					conversation_id: conversationId,
-					project_id: activeProjectId
-				})
-			})
+			var payload = {
+				message: message,
+				agent_slug: agent,
+				session_id: sessionId,
+				conversation_id: conversationId,
+				project_id: activeProjectId
+			};
+
+			var streamedText = '';
+			var streamRaf = null;
+			var contentEl = pending.querySelector('.wpagent-chat__message-content');
+			var messagesEl = pending.parentNode;
+			var renderStreamPreview = function () {
+				streamRaf = null;
+				if (!contentEl) {
+					return;
+				}
+				pending.classList.remove('wpagent-chat__message--pending');
+				pending.classList.add('wpagent-chat__message--streaming');
+				contentEl.innerHTML = renderMarkdown(streamedText);
+				if (messagesEl) {
+					messagesEl.scrollTop = messagesEl.scrollHeight;
+				}
+			};
+			var onDelta = function (latestText) {
+				streamedText = latestText;
+				if (window.requestAnimationFrame) {
+					if (!streamRaf) {
+						streamRaf = window.requestAnimationFrame(renderStreamPreview);
+					}
+				} else {
+					renderStreamPreview();
+				}
+			};
+			var cancelStreamRaf = function () {
+				if (streamRaf && window.cancelAnimationFrame) {
+					window.cancelAnimationFrame(streamRaf);
+				}
+				streamRaf = null;
+			};
+
+			var canStream = Boolean(config.streamUrl && window.ReadableStream && window.TextDecoder);
+			var responsePromise = canStream
+				? streamChatRequest(payload, onDelta)
+				: request(config, config.restUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				});
+
+			responsePromise
 				.then(function (body) {
+					cancelStreamRaf();
 					pending.classList.remove('wpagent-chat__message--pending');
-					setMessageText(pending, body.reply || '');
+					pending.classList.remove('wpagent-chat__message--streaming');
+					body = body || {};
+					setMessageText(pending, body.reply || streamedText || '');
 					addAbilityProposal(pending, body.proposed_ability);
 					addEmailProposal(pending, body.proposed_email, body);
 					addScheduleProposal(pending, body.proposed_schedule, body);
@@ -1660,11 +2011,16 @@
 						checkTokenUsage(body.token_usage);
 					}
 					setStatus(t('replyReceived', 'Resposta recebida'));
+					if (messagesEl) {
+						messagesEl.scrollTop = messagesEl.scrollHeight;
+					}
 					if (conversationId) {
 						return loadConversations();
 					}
 				})
 				.catch(function (error) {
+					cancelStreamRaf();
+					pending.classList.remove('wpagent-chat__message--streaming');
 					markError(pending, error.message);
 					setStatus(t('replyError', 'Erro ao responder'));
 				})
@@ -1686,7 +2042,7 @@
 
 				var fileInput = document.createElement('input');
 				fileInput.type = 'file';
-				fileInput.accept = '.txt,.md,.csv,.json,.pdf,.docx,.html,.htm';
+				fileInput.accept = '.txt,.md,.csv,.json,.pdf,.docx';
 				fileInput.style.display = 'none';
 				chat.appendChild(fileInput);
 
@@ -1931,7 +2287,95 @@
 			button.addEventListener('click', createConversation);
 		});
 		renameButton.addEventListener('click', renameConversation);
+		function setupLeadCapture() {
+			var leadBar = chat.querySelector('[data-wpagent-lead-bar]');
+			if (!leadBar) {
+				return;
+			}
+			var storageKey = 'wpagent-lead-' + agent;
+			var alreadyCaptured = false;
+			try {
+				alreadyCaptured = Boolean(window.localStorage.getItem(storageKey));
+			} catch (err) {}
+
+			if (config.isLoggedIn || !config.leadCaptureEnabled || !config.leadsUrl || alreadyCaptured) {
+				leadBar.style.display = 'none';
+				return;
+			}
+
+			var nameInput = leadBar.querySelector('[data-lead-name]');
+			var emailInput = leadBar.querySelector('[data-lead-email]');
+			var submitLeadBtn = leadBar.querySelector('[data-lead-submit]');
+			var feedbackEl = leadBar.querySelector('[data-lead-feedback]');
+
+			var showLeadFeedback = function (msg, isError) {
+				if (!feedbackEl) {
+					return;
+				}
+				feedbackEl.textContent = msg;
+				feedbackEl.classList.toggle('is-error', Boolean(isError));
+				feedbackEl.style.display = 'block';
+			};
+
+			var submitLead = function () {
+				var name = nameInput ? String(nameInput.value || '').trim() : '';
+				var email = emailInput ? String(emailInput.value || '').trim() : '';
+				if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+					showLeadFeedback(t('leadInvalidEmail', 'Informe um e-mail válido.'), true);
+					if (emailInput) {
+						emailInput.focus();
+					}
+					return;
+				}
+				if (submitLeadBtn) {
+					submitLeadBtn.disabled = true;
+				}
+				request(config, config.leadsUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						agent_slug: agent,
+						name: name,
+						email: email,
+						session_id: sessionId,
+						conversation_id: conversationId
+					})
+				})
+					.then(function (data) {
+						try {
+							window.localStorage.setItem(storageKey, JSON.stringify({ name: name, email: email }));
+						} catch (err) {}
+						showLeadFeedback((data && data.message) || t('leadSaved', 'Obrigado! Seus dados foram registrados.'), false);
+						window.setTimeout(function () {
+							leadBar.style.display = 'none';
+						}, 1400);
+					})
+					.catch(function (err) {
+						showLeadFeedback((err && err.message) || t('replyError', 'Erro ao enviar os dados.'), true);
+						if (submitLeadBtn) {
+							submitLeadBtn.disabled = false;
+						}
+					});
+			};
+
+			if (submitLeadBtn) {
+				submitLeadBtn.addEventListener('click', submitLead);
+			}
+			[nameInput, emailInput].forEach(function (inputEl) {
+				if (!inputEl) {
+					return;
+				}
+				inputEl.addEventListener('keydown', function (event) {
+					if (event.key === 'Enter') {
+						event.preventDefault();
+						submitLead();
+					}
+				});
+			});
+		}
+
 		loadTheme();
+		setupLeadCapture();
 		loadInitialTokenUsage();
 		setEmpty();
 		updateConversationToggleState();

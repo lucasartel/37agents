@@ -15,7 +15,7 @@ class WPAgent_Admin_UI {
 				<div class="wpagents-admin-header-left">
 					<div class="wpagents-admin-header-logo">
 						<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpagent' ) ); ?>">
-							<img src="<?php echo esc_url( $logo_url ); ?>" alt="WPAgents">
+							<img src="<?php echo esc_url( $logo_url ); ?>" alt="37agents">
 						</a>
 					</div>
 					<div>
@@ -29,8 +29,8 @@ class WPAgent_Admin_UI {
 				</div>
 				<div class="wpagents-admin-header-right">
 					<span class="wpagents-badge-version">v<?php echo esc_html( WPAGENT_VERSION ); ?></span>
-					<a href="https://37graus.com.br/wp-agents" target="_blank" class="wpagents-btn-premium">
-						<span>⚡ <?php esc_html_e( 'Suporte & Anuidade', 'wpagent' ); ?></span>
+					<a href="https://37graus.com.br/wp-agents" target="_blank" rel="noopener noreferrer" class="wpagents-btn-premium">
+						<span>📖 <?php esc_html_e( 'Suporte & Documentação', 'wpagent' ); ?></span>
 					</a>
 				</div>
 			</div>
@@ -44,11 +44,24 @@ class WPAgent_Admin_UI {
 	}
 
 	public static function enqueue_styles() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( $screen && false === strpos( (string) $screen->id, 'wpagent' ) && 'wpagent_agent' !== (string) $screen->post_type ) {
+			return;
+		}
+
 		wp_enqueue_style(
 			'wpagents-admin-style',
 			plugins_url( 'assets/css/admin.css', dirname( __FILE__ ) ),
 			array(),
 			WPAGENT_VERSION
+		);
+
+		wp_enqueue_script(
+			'wpagents-admin-script',
+			plugins_url( 'assets/js/admin.js', dirname( __FILE__ ) ),
+			array( 'jquery' ),
+			WPAGENT_VERSION,
+			true
 		);
 	}
 }

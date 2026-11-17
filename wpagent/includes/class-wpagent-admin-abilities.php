@@ -1704,13 +1704,6 @@ class WPAgent_Admin_Abilities {
 			<?php endif; ?>
 		</div>
 		<?php WPAgent_Admin_UI::render_footer(); ?>
-
-		<script>
-		function wpagent_reset_tokens(userId) {
-			document.getElementById('reset_user_id').value = userId;
-			document.querySelector('form[action*="admin-post.php"]').submit();
-		}
-		</script>
 		<?php
 	}
 

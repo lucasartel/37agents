@@ -1,17 +1,16 @@
 <?php
 /**
- * Plugin Name: WPAgents
+ * Plugin Name: 37agents
  * Plugin URI: https://37graus.com.br/wp-agents
- * Description: Personalized AI companion for WordPress 7.0 with local knowledge, user memory, WordPress AI connectors, and OpenRouter fallback.
- * Version: 0.6.1
- * Requires at least: 7.0
+ * Description: Personalized AI companion for WordPress with local knowledge (RAG), user memory, WordPress AI connectors, OpenRouter, Steps, and EAD layouts.
+ * Version: 0.8.0
+ * Requires at least: 6.2
  * Requires PHP: 7.4
- * Tested up to: 7.0.1
- * Author: WPAgents
+ * Tested up to: 6.8
+ * Author: 37graus
  * Author URI: https://37graus.com.br/wp-agents
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Update URI: https://37graus.com.br/wp-agents
  * Text Domain: wpagent
  * Domain Path: /languages
  */
@@ -20,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPAGENT_VERSION', '0.6.1' );
+define( 'WPAGENT_VERSION', '0.8.0' );
 define( 'WPAGENT_FILE', __FILE__ );
 define( 'WPAGENT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WPAGENT_URL', plugin_dir_url( __FILE__ ) );
@@ -96,6 +95,12 @@ if ( ! class_exists( 'WPAgent_Content_Provenance' ) ) {
 }
 if ( ! class_exists( 'WPAgent_Comment_Moderation' ) ) {
 	require_once WPAGENT_PATH . 'includes/class-wpagent-comment-moderation.php';
+}
+if ( ! class_exists( 'WPAgent_Privacy' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-privacy.php';
+}
+if ( ! class_exists( 'WPAgent_Blocks' ) ) {
+	require_once WPAGENT_PATH . 'includes/class-wpagent-blocks.php';
 }
 if ( ! class_exists( 'WPAgent_Plugin' ) ) {
 	require_once WPAGENT_PATH . 'includes/class-wpagent-plugin.php';

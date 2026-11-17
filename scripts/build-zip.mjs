@@ -9,7 +9,7 @@ const dist = path.join(root, 'dist');
 const packageRoot = path.join(dist, 'package');
 const stagedPlugin = path.join(packageRoot, 'wpagent');
 const version = packageJson.version;
-const output = path.join(dist, `wpagent-${version}.zip`);
+const output = path.join(dist, `37agents-${version}.zip`);
 
 await mkdir(dist, { recursive: true });
 await rm(output, { force: true });

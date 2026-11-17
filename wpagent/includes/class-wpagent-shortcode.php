@@ -22,6 +22,7 @@ class WPAgent_Shortcode {
 		add_action( 'admin_enqueue_scripts', array( $this, 'register_assets' ) );
 		add_action( 'wp_footer', array( $this, 'render_public_site_assistant' ), 10 );
 		add_action( 'admin_footer', array( $this, 'render_admin_assistant' ), 10 );
+		add_shortcode( '37agents_chat', array( $this, 'render' ) );
 		add_shortcode( 'wpagent_chat', array( $this, 'render' ) );
 	}
 
@@ -30,7 +31,7 @@ class WPAgent_Shortcode {
 			'wpagent-chat',
 			WPAGENT_URL . 'assets/js/chat.js',
 			array(),
-			WPAGENT_VERSION,
+			WPAGENT_VERSION . '.3',
 			true
 		);
 
@@ -38,7 +39,37 @@ class WPAgent_Shortcode {
 			'wpagent-chat',
 			WPAGENT_URL . 'assets/css/chat.css',
 			array(),
-			WPAGENT_VERSION
+			WPAGENT_VERSION . '.3'
+		);
+
+		wp_register_script(
+			'wpagent-steps',
+			WPAGENT_URL . 'assets/js/steps.js',
+			array(),
+			WPAGENT_VERSION . '.3',
+			true
+		);
+
+		wp_register_style(
+			'wpagent-steps',
+			WPAGENT_URL . 'assets/css/steps.css',
+			array(),
+			WPAGENT_VERSION . '.3'
+		);
+
+		wp_register_script(
+			'wpagent-ead',
+			WPAGENT_URL . 'assets/js/ead.js',
+			array(),
+			WPAGENT_VERSION . '.3',
+			true
+		);
+
+		wp_register_style(
+			'wpagent-ead',
+			WPAGENT_URL . 'assets/css/ead.css',
+			array(),
+			WPAGENT_VERSION . '.3'
 		);
 
 		if ( $this->should_enqueue_floating_assets() ) {
@@ -49,15 +80,54 @@ class WPAgent_Shortcode {
 	public function render( $atts ) {
 		$atts = shortcode_atts(
 			array(
-				'agent' => $this->settings->get( 'agent_slug', 'default' ),
-				'title' => '',
+				'agent'  => $this->settings->get( 'agent_slug', 'default' ),
+				'title'  => '',
+				'layout' => '',
+				'theme'  => '',
 			),
 			$atts,
-			'wpagent_chat'
+			'37agents_chat'
 		);
 
-		$agent = $this->agents->get_agent( $atts['agent'] );
-		$title = $atts['title'] ?: $agent['name'];
+		$agent  = $this->agents->get_agent( $atts['agent'] );
+		$title  = $atts['title'] ?: $agent['name'];
+		$layout = ! empty( $atts['layout'] ) ? sanitize_key( $atts['layout'] ) : ( $agent['frontend_layout'] ?? 'chat' );
+		$theme  = sanitize_key( $atts['theme'] ?? '' );
+		if ( in_array( $theme, array( 'light', 'dark' ), true ) ) {
+			$agent['default_theme'] = $theme;
+		}
+
+		// Role-based access check for shortcode display
+		$allowed_roles = $agent['allowed_roles'] ?? array();
+		if ( ! empty( $allowed_roles ) ) {
+			if ( ! is_user_logged_in() ) {
+				return '<div class="wpagent-access-notice wpagent-access-notice--login" style="padding:16px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:16px 0;text-align:center;"><p style="margin:0;font-size:14px;color:#475569;">' .
+					esc_html__( 'Você precisa fazer login para acessar este assistente.', 'wpagent' ) .
+					' <a href="' . esc_url( wp_login_url( get_permalink() ) ) . '" style="color:#2563eb;font-weight:600;text-decoration:underline;">' .
+					esc_html__( 'Fazer Login', 'wpagent' ) . '</a></p></div>';
+			}
+			$user = wp_get_current_user();
+			$has_role = false;
+			foreach ( $allowed_roles as $role ) {
+				if ( in_array( $role, (array) $user->roles, true ) ) {
+					$has_role = true;
+					break;
+				}
+			}
+			if ( ! $has_role ) {
+				return '<div class="wpagent-access-notice wpagent-access-notice--denied" style="padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin:16px 0;text-align:center;"><p style="margin:0;font-size:14px;color:#b91c1c;">' .
+					esc_html__( 'Você não tem permissão para acessar este assistente.', 'wpagent' ) .
+					'</p></div>';
+			}
+		}
+
+		if ( 'steps' === $layout ) {
+			return $this->render_steps( $agent, $title );
+		}
+
+		if ( 'ead' === $layout ) {
+			return $this->render_ead( $agent, $title );
+		}
 
 		return $this->render_chat( $agent, $title );
 	}
@@ -117,6 +187,8 @@ class WPAgent_Shortcode {
 			class="<?php echo esc_attr( trim( 'wpagent-chat ' . $extra_class ) ); ?>"
 			data-agent="<?php echo esc_attr( $agent['slug'] ); ?>"
 			data-rest-url="<?php echo esc_url( rest_url( 'wpagent/v1/chat' ) ); ?>"
+			data-stream-url="<?php echo esc_url( rest_url( 'wpagent/v1/chat/stream' ) ); ?>"
+			data-leads-url="<?php echo esc_url( rest_url( 'wpagent/v1/leads' ) ); ?>"
 			data-conversations-url="<?php echo esc_url( rest_url( 'wpagent/v1/conversations' ) ); ?>"
 			data-profile-url="<?php echo esc_url( rest_url( 'wpagent/v1/profile' ) ); ?>"
 			data-abilities-url="<?php echo esc_url( rest_url( 'wpagent/v1/abilities/run' ) ); ?>"
@@ -129,14 +201,15 @@ class WPAgent_Shortcode {
 			data-debug-errors="<?php echo current_user_can( 'manage_options' ) ? '1' : '0'; ?>"
 			data-logged-in="<?php echo is_user_logged_in() ? '1' : '0'; ?>"
 			data-user-profile-enabled="<?php echo '1' === ( $agent['user_profile_enabled'] ?? '0' ) ? '1' : '0'; ?>"
-			data-enable-projects="<?php echo '1' === ( $agent['enable_projects'] ?? '0' ) ? '1' : '0'; ?>"
+			data-enable-projects="<?php echo ( is_user_logged_in() && '1' === ( $agent['enable_projects'] ?? '0' ) ) ? '1' : '0'; ?>"
 			data-enable-frontend-uploads="<?php echo '1' === ( $agent['enable_frontend_uploads'] ?? '0' ) ? '1' : '0'; ?>"
+			data-lead-capture-enabled="<?php echo ( ! is_user_logged_in() && '1' === ( $agent['lead_capture_enabled'] ?? '0' ) ) ? '1' : '0'; ?>"
 			data-show-token-usage="<?php echo '1' === ( $agent['show_token_usage'] ?? '0' ) ? '1' : '0'; ?>"
 			data-default-theme="<?php echo 'dark' === ( $agent['default_theme'] ?? 'light' ) ? 'dark' : 'light'; ?>"
 			data-initial-token-usage="<?php echo esc_attr( wp_json_encode( $initial_usage_data ) ); ?>"
 			data-i18n="<?php echo esc_attr( wp_json_encode( WPAgent_I18n::chat_strings() ) ); ?>"
 		>
-			<?php if ( '1' === ( $agent['enable_projects'] ?? '0' ) ) : ?>
+			<?php if ( is_user_logged_in() && '1' === ( $agent['enable_projects'] ?? '0' ) ) : ?>
 				<div class="wpagent-chat__projects-bar" data-wpagent-projects-bar>
 					<div class="wpagent-chat__projects-tabs" data-wpagent-projects-tabs></div>
 					<button type="button" class="wpagent-chat__add-project" data-wpagent-add-project title="<?php esc_attr_e( 'Nova aba / projeto', 'wpagent' ); ?>">+ <?php esc_html_e( 'Novo projeto', 'wpagent' ); ?></button>
@@ -183,6 +256,7 @@ class WPAgent_Shortcode {
 						<button type="button" class="wpagent-chat__theme-toggle" aria-pressed="false"><?php esc_html_e( 'Modo escuro', 'wpagent' ); ?></button>
 						<button type="button" class="wpagent-chat__rename-conversation"><?php esc_html_e( 'Renomear', 'wpagent' ); ?></button>
 					</div>
+					<?php echo $this->render_lead_capture_bar( $agent ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<div class="wpagent-chat__messages" role="log" aria-live="polite">
 						<div class="wpagent-chat__empty">
 							<strong><?php esc_html_e( 'Como posso ajudar?', 'wpagent' ); ?></strong>
@@ -196,6 +270,7 @@ class WPAgent_Shortcode {
 							<button type="submit"><?php esc_html_e( 'Enviar', 'wpagent' ); ?></button>
 						</div>
 						<div class="wpagent-chat__hint"><?php esc_html_e( 'Enter envia. Shift + Enter quebra linha.', 'wpagent' ); ?></div>
+						<?php echo $this->render_privacy_consent_notice( $agent ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						<?php if ( '1' === ( $agent['show_token_usage'] ?? '0' ) && $this->repository ) : ?>
 							<div class="wpagent-chat__token-usage" data-wpagent-token-usage>
 								<div class="wpagent-chat__token-summary">
@@ -300,6 +375,267 @@ class WPAgent_Shortcode {
 				</div>
 				<?php echo $this->render_chat( $agent, $title, 'wpagent-chat--floating' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	private function render_steps( $agent, $title, $extra_class = '' ) {
+		wp_enqueue_script( 'wpagent-steps' );
+		wp_enqueue_style( 'wpagent-steps' );
+
+		ob_start();
+		?>
+		<div
+			class="<?php echo esc_attr( trim( 'wpagent-steps ' . $extra_class ) ); ?>"
+			data-agent="<?php echo esc_attr( $agent['slug'] ); ?>"
+			data-rest-url="<?php echo esc_url( rest_url( 'wpagent/v1/chat' ) ); ?>"
+			data-leads-url="<?php echo esc_url( rest_url( 'wpagent/v1/leads' ) ); ?>"
+			data-progress-url="<?php echo esc_url( rest_url( 'wpagent/v1/progress' ) ); ?>"
+			data-report-url="<?php echo esc_url( rest_url( 'wpagent/v1/steps/generate-report' ) ); ?>"
+			data-reset-url="<?php echo esc_url( rest_url( 'wpagent/v1/progress/reset' ) ); ?>"
+			data-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>"
+			data-logged-in="<?php echo is_user_logged_in() ? '1' : '0'; ?>"
+			data-lead-capture-enabled="<?php echo ( ! is_user_logged_in() && '1' === ( $agent['lead_capture_enabled'] ?? '0' ) ) ? '1' : '0'; ?>"
+			data-button-label="<?php echo esc_attr( $agent['steps_button_label'] ?? __( 'Gerar Relatório Final', 'wpagent' ) ); ?>"
+			data-default-theme="<?php echo 'dark' === ( $agent['default_theme'] ?? 'light' ) ? 'dark' : 'light'; ?>"
+		>
+		<script type="application/json" class="wpagent-steps-config"><?php
+			echo wp_json_encode( array(
+				'intro'     => $agent['steps_intro'] ?? '',
+				'questions' => $agent['steps_questions'] ?? '',
+			) );
+		?></script>
+			<div class="wpagent-steps__header">
+				<div class="wpagent-steps__header-info">
+					<h2 class="wpagent-steps__title"><?php echo esc_html( $title ); ?></h2>
+					<div class="wpagent-steps__header-meta">
+						<span class="wpagent-steps__step-count" data-steps-count><?php esc_html_e( 'Carregando etapas...', 'wpagent' ); ?></span>
+						<button type="button" class="wpagent-steps__theme-toggle" data-steps-theme-toggle aria-pressed="false" title="<?php esc_attr_e( 'Alternar tema claro/escuro', 'wpagent' ); ?>">
+							🌙 <?php esc_html_e( 'Modo escuro', 'wpagent' ); ?>
+						</button>
+					</div>
+				</div>
+				<div class="wpagent-steps__progress-track">
+					<div class="wpagent-steps__progress-bar" data-steps-progress style="width: 0%;"></div>
+				</div>
+			</div>
+
+			<div class="wpagent-steps__body">
+				<?php echo $this->render_lead_capture_bar( $agent ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<!-- Card de Introdução (se houver) -->
+				<div class="wpagent-steps__intro-card" data-steps-intro-card style="display:none;">
+					<div class="wpagent-steps__intro-content" data-steps-intro-text></div>
+					<button type="button" class="wpagent-steps__start-btn" data-steps-start><?php esc_html_e( 'Iniciar Passo a Passo ➔', 'wpagent' ); ?></button>
+				</div>
+
+				<!-- Card da Pergunta Atual -->
+				<div class="wpagent-steps__question-card" data-steps-question-card>
+					<div class="wpagent-steps__badge" data-steps-badge><?php esc_html_e( 'Etapa 1', 'wpagent' ); ?></div>
+					<h3 class="wpagent-steps__question-title" data-steps-question-title></h3>
+					<p class="wpagent-steps__question-tip" data-steps-question-tip></p>
+
+					<div class="wpagent-steps__input-area">
+						<textarea class="wpagent-steps__textarea" data-steps-input rows="4" placeholder="<?php esc_attr_e( 'Digite sua resposta aqui...', 'wpagent' ); ?>"></textarea>
+						<div class="wpagent-steps__shortcut-hint"><?php esc_html_e( 'Dica: pressione Ctrl + Enter (ou ⌘ + Enter) para avançar rapidamente.', 'wpagent' ); ?></div>
+					</div>
+
+					<div class="wpagent-steps__actions">
+						<div class="wpagent-steps__actions-left" style="display:flex;gap:8px;align-items:center;">
+							<button type="button" class="wpagent-steps__prev-btn" data-steps-prev style="display:none;" title="<?php esc_attr_e( 'Voltar para a etapa anterior', 'wpagent' ); ?>">
+								<?php esc_html_e( '⬅️ Voltar', 'wpagent' ); ?>
+							</button>
+							<button type="button" class="wpagent-steps__skip-btn" data-steps-skip title="<?php esc_attr_e( 'Pular esta pergunta', 'wpagent' ); ?>">
+								<?php esc_html_e( '⏭️ Pular pergunta', 'wpagent' ); ?>
+							</button>
+						</div>
+						<button type="button" class="wpagent-steps__next-btn" data-steps-next>
+							<?php esc_html_e( 'Próxima Etapa ➔', 'wpagent' ); ?>
+						</button>
+					</div>
+				</div>
+
+				<!-- Tela de Conclusão / Relatório Final -->
+				<div class="wpagent-steps__report-card" data-steps-report-card style="display:none;">
+					<div class="wpagent-steps__report-header">
+						<div class="wpagent-steps__report-badge">🎉 <?php esc_html_e( 'Concluído com Sucesso!', 'wpagent' ); ?></div>
+						<h3><?php esc_html_e( 'Relatório Final Gerado', 'wpagent' ); ?></h3>
+						<p><?php esc_html_e( 'Confira abaixo o resultado elaborado com base em todas as suas respostas.', 'wpagent' ); ?></p>
+					</div>
+
+					<div class="wpagent-steps__report-content" data-steps-report-content></div>
+
+					<div class="wpagent-steps__report-actions">
+						<button type="button" class="button button-primary wpagent-steps__copy-btn" data-steps-copy>
+							📋 <?php esc_html_e( 'Copiar Relatório', 'wpagent' ); ?>
+						</button>
+						<button type="button" class="button wpagent-steps__print-btn" data-steps-print>
+							🖨️ <?php esc_html_e( 'Imprimir / PDF', 'wpagent' ); ?>
+						</button>
+						<button type="button" class="button wpagent-steps__restart-btn" data-steps-restart>
+							🔄 <?php esc_html_e( 'Refazer Questionário', 'wpagent' ); ?>
+						</button>
+					</div>
+				</div>
+				<?php echo $this->render_privacy_consent_notice( $agent ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	private function render_ead( $agent, $title, $extra_class = '' ) {
+		wp_enqueue_script( 'wpagent-ead' );
+		wp_enqueue_style( 'wpagent-ead' );
+
+		ob_start();
+		?>
+		<div
+			class="<?php echo esc_attr( trim( 'wpagent-ead ' . $extra_class ) ); ?>"
+			data-agent="<?php echo esc_attr( $agent['slug'] ); ?>"
+			data-course-title="<?php echo esc_attr( $agent['ead_course_title'] ?: $title ); ?>"
+			data-syllabus="<?php echo esc_attr( $agent['ead_syllabus'] ?? '' ); ?>"
+			data-rest-url="<?php echo esc_url( rest_url( 'wpagent/v1/chat' ) ); ?>"
+			data-progress-url="<?php echo esc_url( rest_url( 'wpagent/v1/progress' ) ); ?>"
+			data-lesson-url="<?php echo esc_url( rest_url( 'wpagent/v1/ead/generate-lesson' ) ); ?>"
+			data-reset-url="<?php echo esc_url( rest_url( 'wpagent/v1/progress/reset' ) ); ?>"
+			data-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>"
+			data-logged-in="<?php echo is_user_logged_in() ? '1' : '0'; ?>"
+			data-default-theme="<?php echo 'dark' === ( $agent['default_theme'] ?? 'light' ) ? 'dark' : 'light'; ?>"
+		>
+			<div class="wpagent-ead__wrapper">
+				<!-- Barra Lateral: Módulos e Aulas -->
+				<div class="wpagent-ead__sidebar" data-ead-sidebar>
+					<div class="wpagent-ead__sidebar-header">
+						<div class="wpagent-ead__sidebar-top">
+							<h3 class="wpagent-ead__course-name"><?php echo esc_html( $agent['ead_course_title'] ?: $title ); ?></h3>
+							<button type="button" class="wpagent-ead__mobile-drawer-btn" data-ead-drawer-toggle aria-expanded="false">
+								📚 <?php esc_html_e( 'Módulos', 'wpagent' ); ?>
+							</button>
+						</div>
+						<div class="wpagent-ead__course-progress">
+							<div class="wpagent-ead__progress-label">
+								<span><?php esc_html_e( 'Progresso do Curso:', 'wpagent' ); ?></span>
+								<strong data-ead-progress-pct>0%</strong>
+							</div>
+							<div class="wpagent-ead__progress-track">
+								<div class="wpagent-ead__progress-bar" data-ead-progress-bar style="width: 0%;"></div>
+							</div>
+						</div>
+					</div>
+
+					<div class="wpagent-ead__modules-list" data-ead-modules>
+						<!-- Módulos e aulas renderizados via JS -->
+					</div>
+				</div>
+
+				<!-- Área Central: Aula e Tutor IA -->
+				<div class="wpagent-ead__main">
+					<div class="wpagent-ead__lesson-header">
+						<div class="wpagent-ead__breadcrumb" data-ead-breadcrumb><?php esc_html_e( 'Selecione uma aula', 'wpagent' ); ?></div>
+						<h1 class="wpagent-ead__lesson-title" data-ead-lesson-title></h1>
+						<div class="wpagent-ead__header-actions">
+							<button type="button" class="wpagent-ead__theme-toggle" data-ead-theme-toggle aria-pressed="false" title="<?php esc_attr_e( 'Alternar tema claro/escuro', 'wpagent' ); ?>">
+								🌙 <?php esc_html_e( 'Modo escuro', 'wpagent' ); ?>
+							</button>
+							<?php if ( current_user_can( 'edit_posts' ) || current_user_can( 'manage_options' ) ) : ?>
+								<button type="button" class="wpagent-ead__regenerate-btn" data-ead-regenerate-btn title="<?php esc_attr_e( 'Regerar conteúdo desta aula com IA', 'wpagent' ); ?>">
+									<?php esc_html_e( '🔄 Regerar Conteúdo', 'wpagent' ); ?>
+								</button>
+							<?php endif; ?>
+							<button type="button" class="wpagent-ead__complete-btn" data-ead-complete-btn>
+								<?php esc_html_e( '✓ Marcar como Concluída', 'wpagent' ); ?>
+							</button>
+						</div>
+					</div>
+
+					<div class="wpagent-ead__lesson-body">
+						<div class="wpagent-ead__content-container" data-ead-lesson-content>
+							<div class="wpagent-ead__loading-state"><?php esc_html_e( 'Carregando conteúdo da aula...', 'wpagent' ); ?></div>
+						</div>
+
+						<div class="wpagent-ead__navigation">
+							<button type="button" class="wpagent-ead__nav-btn wpagent-ead__nav-btn--prev" data-ead-prev-btn disabled>
+								⬅ <?php esc_html_e( 'Aula Anterior', 'wpagent' ); ?>
+							</button>
+							<button type="button" class="wpagent-ead__nav-btn wpagent-ead__nav-btn--next" data-ead-next-btn disabled>
+								<?php esc_html_e( 'Próxima Aula', 'wpagent' ); ?> ➡
+							</button>
+						</div>
+					</div>
+
+					<!-- Tutor IA Integrado na Aula -->
+					<div class="wpagent-ead__tutor">
+						<div class="wpagent-ead__tutor-header">
+							<div class="wpagent-ead__tutor-info">
+								<span class="wpagent-ead__tutor-avatar">🎓</span>
+								<div>
+									<strong><?php esc_html_e( 'Tutor IA da Aula', 'wpagent' ); ?></strong>
+									<span><?php esc_html_e( 'Tire suas dúvidas ou peça explicações extras sobre esta lição', 'wpagent' ); ?></span>
+								</div>
+							</div>
+						</div>
+
+						<div class="wpagent-ead__tutor-prompts">
+							<button type="button" class="wpagent-ead__prompt-chip" data-ead-prompt="<?php esc_attr_e( 'Pode resumir os 3 pontos mais importantes desta aula?', 'wpagent' ); ?>">💡 <?php esc_html_e( 'Resumir pontos-chave', 'wpagent' ); ?></button>
+							<button type="button" class="wpagent-ead__prompt-chip" data-ead-prompt="<?php esc_attr_e( 'Dê um exemplo prático do que foi ensinado nesta aula.', 'wpagent' ); ?>">📝 <?php esc_html_e( 'Exemplo prático', 'wpagent' ); ?></button>
+							<button type="button" class="wpagent-ead__prompt-chip" data-ead-prompt="<?php esc_attr_e( 'Faça uma pergunta para testar se eu compreendi o conteúdo.', 'wpagent' ); ?>">❓ <?php esc_html_e( 'Testar meu conhecimento', 'wpagent' ); ?></button>
+						</div>
+
+						<div class="wpagent-ead__tutor-messages" data-ead-tutor-messages></div>
+
+						<form class="wpagent-ead__tutor-form" data-ead-tutor-form>
+							<input type="text" class="wpagent-ead__tutor-input" data-ead-tutor-input placeholder="<?php esc_attr_e( 'Pergunte qualquer coisa sobre a aula atual...', 'wpagent' ); ?>">
+							<button type="submit" class="wpagent-ead__tutor-send"><?php esc_html_e( 'Perguntar', 'wpagent' ); ?></button>
+						</form>
+						<?php echo $this->render_privacy_consent_notice( $agent ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					</div>
+				</div>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	private function render_privacy_consent_notice( $agent ) {
+		if ( '1' !== ( $agent['privacy_consent_enabled'] ?? '0' ) ) {
+			return '';
+		}
+
+		$text = trim( (string) ( $agent['privacy_consent_text'] ?? '' ) );
+		if ( '' === $text ) {
+			$text = __( 'Ao enviar mensagens, você concorda com o processamento por IA conforme nossa Política de Privacidade.', 'wpagent' );
+		}
+
+		$policy_url = function_exists( 'get_privacy_policy_url' ) ? get_privacy_policy_url() : '';
+
+		ob_start();
+		?>
+		<div class="wpagent-privacy-consent">
+			<span>🔒 <?php echo esc_html( $text ); ?></span>
+			<?php if ( ! empty( $policy_url ) ) : ?>
+				<a href="<?php echo esc_url( $policy_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Política de Privacidade', 'wpagent' ); ?></a>
+			<?php endif; ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	private function render_lead_capture_bar( $agent ) {
+		if ( is_user_logged_in() || '1' !== ( $agent['lead_capture_enabled'] ?? '0' ) ) {
+			return '';
+		}
+
+		ob_start();
+		?>
+		<div class="wpagent-lead-bar" data-wpagent-lead-bar>
+			<div class="wpagent-lead-bar__title">✉️ <?php esc_html_e( 'Identifique-se para receber acompanhamento', 'wpagent' ); ?></div>
+			<div class="wpagent-lead-bar__fields">
+				<input type="text" class="wpagent-lead-bar__input" data-lead-name placeholder="<?php esc_attr_e( 'Seu nome', 'wpagent' ); ?>" maxlength="120">
+				<input type="email" class="wpagent-lead-bar__input" data-lead-email placeholder="<?php esc_attr_e( 'Seu melhor e-mail', 'wpagent' ); ?>" maxlength="190">
+				<button type="button" class="wpagent-lead-bar__submit" data-lead-submit><?php esc_html_e( 'Continuar', 'wpagent' ); ?></button>
+			</div>
+			<div class="wpagent-lead-bar__feedback" data-lead-feedback style="display:none;"></div>
 		</div>
 		<?php
 		return ob_get_clean();

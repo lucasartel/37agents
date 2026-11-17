@@ -1421,3 +1421,215 @@
 	justify-content: flex-end;
 	margin-top: 6px;
 }
+
+/* Custom Inline Prompt & Confirm Dialog */
+.wpagent-chat__dialog-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.52);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 99999;
+	padding: 16px;
+}
+
+.wpagent-chat__dialog {
+	background: var(--wpagent-surface);
+	border: 1px solid var(--wpagent-border);
+	border-radius: 12px;
+	box-shadow: 0 20px 44px rgba(0, 0, 0, 0.25);
+	color: var(--wpagent-text);
+	display: grid;
+	gap: 12px;
+	max-width: 400px;
+	padding: 20px;
+	width: 100%;
+}
+
+.wpagent-chat__dialog h4 {
+	font-size: 15px;
+	font-weight: 700;
+	margin: 0;
+	color: var(--wpagent-text);
+}
+
+.wpagent-chat__dialog p {
+	color: var(--wpagent-muted);
+	font-size: 13px;
+	line-height: 1.45;
+	margin: 0;
+}
+
+.wpagent-chat__dialog-input {
+	background: var(--wpagent-panel);
+	border: 1px solid var(--wpagent-border);
+	border-radius: 8px;
+	color: var(--wpagent-text);
+	font-family: inherit;
+	font-size: 14px;
+	padding: 9px 12px;
+	width: 100%;
+}
+
+.wpagent-chat__dialog-input:focus {
+	border-color: var(--wpagent-focus);
+	outline: none;
+}
+
+.wpagent-chat__dialog-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 4px;
+}
+
+.wpagent-chat__dialog-btn {
+	appearance: none;
+	background: var(--wpagent-panel);
+	border: 1px solid var(--wpagent-border);
+	border-radius: 8px;
+	color: var(--wpagent-text);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	padding: 7px 14px;
+	transition: all 0.15s ease;
+}
+
+.wpagent-chat__dialog-btn:hover {
+	background: var(--wpagent-soft);
+}
+
+.wpagent-chat__dialog-btn--primary {
+	background: var(--wpagent-accent);
+	border-color: var(--wpagent-accent);
+	color: var(--wpagent-accent-text);
+}
+
+.wpagent-chat__dialog-btn--primary.is-danger {
+	background: #dc2626;
+	border-color: #dc2626;
+	color: #ffffff;
+}
+
+.wpagent-chat__message--streaming .wpagent-chat__message-content::after {
+	content: "";
+	display: inline-block;
+	width: 7px;
+	height: 1em;
+	margin-left: 3px;
+	vertical-align: -2px;
+	background: currentColor;
+	opacity: 0.7;
+	animation: wpagent-stream-cursor 0.9s steps(2, start) infinite;
+}
+
+@keyframes wpagent-stream-cursor {
+	0%, 100% {
+		opacity: 0.75;
+	}
+	50% {
+		opacity: 0.1;
+	}
+}
+
+.wpagent-privacy-consent {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 14px;
+	padding: 9px 14px;
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--wpagent-muted);
+	background: var(--wpagent-panel);
+	border-bottom: 1px solid var(--wpagent-border);
+}
+
+.wpagent-privacy-consent a {
+	color: var(--wpagent-user-bg);
+	font-weight: 600;
+	text-decoration: underline;
+	white-space: nowrap;
+}
+
+.wpagent-lead-bar {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 14px;
+	background: var(--wpagent-soft);
+	border-bottom: 1px solid var(--wpagent-border);
+	font-size: 13px;
+}
+
+.wpagent-lead-bar__title {
+	font-weight: 600;
+	color: var(--wpagent-text);
+}
+
+.wpagent-lead-bar__fields {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.wpagent-lead-bar__input {
+	flex: 1 1 160px;
+	min-width: 0;
+	padding: 7px 10px;
+	font-size: 13px;
+	line-height: 1.3;
+	color: var(--wpagent-text);
+	background: var(--wpagent-surface);
+	border: 1px solid var(--wpagent-border);
+	border-radius: 6px;
+}
+
+.wpagent-lead-bar__input:focus {
+	outline: none;
+	border-color: var(--wpagent-focus);
+}
+
+.wpagent-lead-bar__submit {
+	padding: 7px 14px;
+	font-size: 13px;
+	font-weight: 600;
+	color: #ffffff;
+	background: var(--wpagent-user-bg);
+	border: 1px solid var(--wpagent-user-bg);
+	border-radius: 6px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.wpagent-lead-bar__submit:disabled {
+	opacity: 0.65;
+	cursor: not-allowed;
+}
+
+.wpagent-lead-bar__feedback {
+	font-size: 12px;
+	font-weight: 600;
+	color: #047857;
+}
+
+.wpagent-lead-bar__feedback.is-error {
+	color: #dc2626;
+}
+
+.wpagent-chat.is-dark-mode .wpagent-privacy-consent a {
+	color: var(--wpagent-focus);
+}
+
+.wpagent-chat.is-dark-mode .wpagent-lead-bar__feedback {
+	color: #34d399;
+}
+
+.wpagent-chat.is-dark-mode .wpagent-lead-bar__feedback.is-error {
+	color: #f87171;
+}

@@ -88,7 +88,12 @@ class WPAgent_Periodic_Tasks {
 		}
 
 		if ( $has_due ) {
-			$this->process_due_tasks();
+			if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
+				wp_schedule_single_event( time(), self::CRON_HOOK );
+			}
+			if ( function_exists( 'spawn_cron' ) ) {
+				spawn_cron();
+			}
 		}
 	}
 

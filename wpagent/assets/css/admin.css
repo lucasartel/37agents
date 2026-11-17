@@ -402,3 +402,89 @@
 		align-items: flex-start;
 	}
 }
+
+/* Agent Configuration Metabox Tabs */
+.wpagent-agent-tabs-wrapper {
+	margin-top: 6px;
+}
+
+.wpagent-agent-tabs-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	border-bottom: 2px solid #e2e8f0;
+	padding-bottom: 0;
+	margin-bottom: 16px;
+}
+
+.wpagent-agent-tab-btn {
+	appearance: none;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-bottom: none;
+	border-radius: 8px 8px 0 0;
+	color: #475569;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	padding: 10px 16px;
+	margin-bottom: -2px;
+	transition: all 0.15s ease;
+}
+
+.wpagent-agent-tab-btn:hover {
+	background: #f1f5f9;
+	color: #0f172a;
+}
+
+.wpagent-agent-tab-btn.is-active {
+	background: #ffffff;
+	border-color: #cbd5e1;
+	border-bottom: 2px solid #ffffff;
+	color: #0284c7;
+	box-shadow: 0 -2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.wpagent-agent-tab-panel {
+	display: none;
+}
+
+.wpagent-agent-tab-panel.is-active {
+	display: block;
+}
+
+/* Starter Templates Bar */
+.wpagent-starter-templates {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	padding: 12px 14px;
+	margin-bottom: 14px;
+}
+
+.wpagent-starter-templates__header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+	font-size: 13px;
+	color: #0f172a;
+}
+
+.wpagent-template-feedback {
+	color: #15803d;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.wpagent-starter-templates__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.wpagent-starter-btn {
+	font-weight: 500 !important;
+}

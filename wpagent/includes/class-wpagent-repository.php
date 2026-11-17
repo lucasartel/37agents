@@ -6,6 +6,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! class_exists( 'WPAgent_Repository' ) ) {
 class WPAgent_Repository {
+	private static $verified_tables = array();
+
+	private function is_schema_verified( $key, $force = false ) {
+		if ( $force ) {
+			return false;
+		}
+		if ( ! empty( self::$verified_tables[ $key ] ) ) {
+			return true;
+		}
+		if ( defined( 'WPAGENT_VERSION' ) && get_option( 'wpagent_schema_version' ) === WPAGENT_VERSION ) {
+			self::$verified_tables[ $key ] = true;
+			return true;
+		}
+		return false;
+	}
+
 	public function record_interaction( $data ) {
 		global $wpdb;
 
@@ -729,17 +745,26 @@ class WPAgent_Repository {
 		$table         = $wpdb->prefix . 'wpagent_sources';
 		$attachment_id = absint( $data['attachment_id'] ?? 0 );
 		$agent_slug    = sanitize_key( $data['agent_slug'] ?? 'default' );
+		$source_type   = sanitize_key( $data['source_type'] ?? 'upload' );
 		$existing_id   = 0;
 
-		if ( $attachment_id ) {
+		if ( $attachment_id && 'wp_post' === $source_type ) {
 			$existing_id = (int) $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT id FROM {$table} WHERE attachment_id = %d AND agent_slug = %s LIMIT 1",
+					"SELECT id FROM {$table} WHERE attachment_id = %d AND agent_slug = %s AND source_type = 'wp_post' LIMIT 1",
 					$attachment_id,
 					$agent_slug
 				)
 			);
-		} elseif ( 'manual' === ( $data['source_type'] ?? '' ) ) {
+		} elseif ( $attachment_id ) {
+			$existing_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$table} WHERE attachment_id = %d AND agent_slug = %s AND source_type <> 'wp_post' LIMIT 1",
+					$attachment_id,
+					$agent_slug
+				)
+			);
+		} elseif ( 'manual' === $source_type ) {
 			$existing_id = (int) $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT id FROM {$table} WHERE post_id = %d AND agent_slug = %s AND source_type = 'manual' AND title = %s LIMIT 1",
@@ -1210,7 +1235,12 @@ class WPAgent_Repository {
 		);
 	}
 
-	public function ensure_email_schedules_tables_exist() {
+	public function ensure_email_schedules_tables_exist( $force = false ) {
+		if ( $this->is_schema_verified( 'email_schedules', $force ) ) {
+			return;
+		}
+		self::$verified_tables['email_schedules'] = true;
+
 		global $wpdb;
 
 		$schedules_table     = $wpdb->prefix . 'wpagent_email_schedules';
@@ -1727,7 +1757,12 @@ class WPAgent_Repository {
 	}
 
 	// Projects / Workspace Tabs Management
-	public function ensure_projects_table_exists() {
+	public function ensure_projects_table_exists( $force = false ) {
+		if ( $this->is_schema_verified( 'projects', $force ) ) {
+			return;
+		}
+		self::$verified_tables['projects'] = true;
+
 		global $wpdb;
 
 		$table           = $wpdb->prefix . 'wpagent_projects';
@@ -1921,7 +1956,12 @@ class WPAgent_Repository {
 		return true;
 	}
 
-	public function ensure_periodic_contents_table_exists() {
+	public function ensure_periodic_contents_table_exists( $force = false ) {
+		if ( $this->is_schema_verified( 'periodic_contents', $force ) ) {
+			return;
+		}
+		self::$verified_tables['periodic_contents'] = true;
+
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'wpagent_periodic_contents';
@@ -2043,6 +2083,411 @@ class WPAgent_Repository {
 			array( 'id' => absint( $id ) ),
 			array( '%d' )
 		);
+	}
+
+	public function ensure_user_progress_table_exists( $force = false ) {
+		if ( $this->is_schema_verified( 'user_progress', $force ) ) {
+			return;
+		}
+		self::$verified_tables['user_progress'] = true;
+
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'wpagent_user_progress';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table ) {
+			return;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$charset_collate = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			session_id varchar(120) NOT NULL DEFAULT '',
+			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			layout_type varchar(40) NOT NULL DEFAULT 'steps',
+			current_step int unsigned NOT NULL DEFAULT 0,
+			completed_steps longtext NULL,
+			current_lesson varchar(120) NOT NULL DEFAULT '',
+			completed_lessons longtext NULL,
+			final_report longtext NULL,
+			status varchar(40) NOT NULL DEFAULT 'in_progress',
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY user_agent_layout (user_id, agent_slug, layout_type),
+			KEY session_agent_layout (session_id, agent_slug, layout_type)
+		) {$charset_collate};";
+
+		dbDelta( $sql );
+	}
+
+	public function get_user_progress( $user_id, $agent_slug, $layout_type = 'steps', $session_id = '' ) {
+		global $wpdb;
+
+		$this->ensure_user_progress_table_exists();
+		$table = $wpdb->prefix . 'wpagent_user_progress';
+
+		$user_id_val = absint( $user_id );
+		$slug_val    = sanitize_key( $agent_slug );
+		$layout_val  = sanitize_key( $layout_type );
+		$session_val = sanitize_text_field( $session_id );
+
+		if ( $user_id_val > 0 ) {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT * FROM {$table} WHERE user_id = %d AND agent_slug = %s AND layout_type = %s ORDER BY updated_at DESC LIMIT 1",
+					$user_id_val,
+					$slug_val,
+					$layout_val
+				),
+				ARRAY_A
+			);
+		} elseif ( ! empty( $session_val ) ) {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT * FROM {$table} WHERE session_id = %s AND agent_slug = %s AND layout_type = %s ORDER BY updated_at DESC LIMIT 1",
+					$session_val,
+					$slug_val,
+					$layout_val
+				),
+				ARRAY_A
+			);
+		} else {
+			return null;
+		}
+
+		if ( ! $row ) {
+			return null;
+		}
+
+		if ( ! empty( $row['completed_steps'] ) ) {
+			$row['completed_steps'] = json_decode( $row['completed_steps'], true ) ?: array();
+		} else {
+			$row['completed_steps'] = array();
+		}
+
+		if ( ! empty( $row['completed_lessons'] ) ) {
+			$row['completed_lessons'] = json_decode( $row['completed_lessons'], true ) ?: array();
+		} else {
+			$row['completed_lessons'] = array();
+		}
+
+		return $row;
+	}
+
+	public function save_user_progress( array $data ) {
+		global $wpdb;
+
+		$this->ensure_user_progress_table_exists();
+		$table = $wpdb->prefix . 'wpagent_user_progress';
+
+		$user_id     = absint( $data['user_id'] ?? 0 );
+		$session_id  = sanitize_text_field( $data['session_id'] ?? '' );
+		$agent_slug  = sanitize_key( $data['agent_slug'] ?? 'default' );
+		$layout_type = sanitize_key( $data['layout_type'] ?? 'steps' );
+
+		$existing = $this->get_user_progress( $user_id, $agent_slug, $layout_type, $session_id );
+
+		$payload = array(
+			'user_id'     => $user_id,
+			'session_id'  => $session_id,
+			'agent_slug'  => $agent_slug,
+			'layout_type' => $layout_type,
+			'updated_at'  => current_time( 'mysql' ),
+		);
+
+		if ( isset( $data['current_step'] ) ) {
+			$payload['current_step'] = absint( $data['current_step'] );
+		}
+		if ( isset( $data['completed_steps'] ) ) {
+			$payload['completed_steps'] = is_array( $data['completed_steps'] ) ? wp_json_encode( $data['completed_steps'] ) : (string) $data['completed_steps'];
+		}
+		if ( isset( $data['current_lesson'] ) ) {
+			$payload['current_lesson'] = sanitize_text_field( $data['current_lesson'] );
+		}
+		if ( isset( $data['completed_lessons'] ) ) {
+			$payload['completed_lessons'] = is_array( $data['completed_lessons'] ) ? wp_json_encode( $data['completed_lessons'] ) : (string) $data['completed_lessons'];
+		}
+		if ( isset( $data['final_report'] ) ) {
+			$payload['final_report'] = $data['final_report'];
+		}
+		if ( isset( $data['status'] ) ) {
+			$payload['status'] = sanitize_key( $data['status'] );
+		}
+
+		if ( $existing && ! empty( $existing['id'] ) ) {
+			$wpdb->update(
+				$table,
+				$payload,
+				array( 'id' => absint( $existing['id'] ) )
+			);
+			$id = absint( $existing['id'] );
+		} else {
+			$payload['created_at'] = current_time( 'mysql' );
+			$wpdb->insert( $table, $payload );
+			$id = $wpdb->insert_id;
+		}
+
+		return $this->get_user_progress( $user_id, $agent_slug, $layout_type, $session_id );
+	}
+
+	public function reset_user_progress( $user_id, $agent_slug, $layout_type = 'steps', $session_id = '' ) {
+		global $wpdb;
+
+		$this->ensure_user_progress_table_exists();
+		$table = $wpdb->prefix . 'wpagent_user_progress';
+
+		$user_id_val = absint( $user_id );
+		$slug_val    = sanitize_key( $agent_slug );
+		$layout_val  = sanitize_key( $layout_type );
+		$session_val = sanitize_text_field( $session_id );
+
+		if ( $user_id_val > 0 ) {
+			return (bool) $wpdb->delete(
+				$table,
+				array(
+					'user_id'     => $user_id_val,
+					'agent_slug'  => $slug_val,
+					'layout_type' => $layout_val,
+				),
+				array( '%d', '%s', '%s' )
+			);
+		} elseif ( ! empty( $session_val ) ) {
+			return (bool) $wpdb->delete(
+				$table,
+				array(
+					'session_id'  => $session_val,
+					'agent_slug'  => $slug_val,
+					'layout_type' => $layout_val,
+				),
+				array( '%s', '%s', '%s' )
+			);
+		}
+
+		return false;
+	}
+
+	public function ensure_ead_lessons_table_exists( $force = false ) {
+		if ( $this->is_schema_verified( 'ead_lessons', $force ) ) {
+			return;
+		}
+		self::$verified_tables['ead_lessons'] = true;
+
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'wpagent_ead_lessons';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table ) {
+			return;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$charset_collate = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			agent_slug varchar(120) NOT NULL DEFAULT 'default',
+			lesson_key varchar(64) NOT NULL DEFAULT '',
+			module_title varchar(255) NOT NULL DEFAULT '',
+			lesson_title varchar(255) NOT NULL DEFAULT '',
+			content longtext NOT NULL,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY agent_lesson (agent_slug, lesson_key),
+			KEY agent_slug (agent_slug)
+		) {$charset_collate};";
+
+		dbDelta( $sql );
+	}
+
+	public function get_ead_lesson( $agent_slug, $lesson_key ) {
+		global $wpdb;
+
+		$this->ensure_ead_lessons_table_exists();
+		$table = $wpdb->prefix . 'wpagent_ead_lessons';
+
+		$slug_val = sanitize_key( $agent_slug );
+		$key_val  = sanitize_text_field( $lesson_key );
+
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE agent_slug = %s AND lesson_key = %s LIMIT 1",
+				$slug_val,
+				$key_val
+			),
+			ARRAY_A
+		);
+	}
+
+	public function save_ead_lesson( $agent_slug, $lesson_key, $module_title, $lesson_title, $content ) {
+		global $wpdb;
+
+		$this->ensure_ead_lessons_table_exists();
+		$table = $wpdb->prefix . 'wpagent_ead_lessons';
+
+		$slug_val   = sanitize_key( $agent_slug );
+		$key_val    = sanitize_text_field( $lesson_key );
+		$module_val = sanitize_text_field( $module_title );
+		$title_val  = sanitize_text_field( $lesson_title );
+
+		$existing = $this->get_ead_lesson( $slug_val, $key_val );
+
+		if ( $existing && ! empty( $existing['id'] ) ) {
+			$wpdb->update(
+				$table,
+				array(
+					'module_title' => $module_val,
+					'lesson_title' => $title_val,
+					'content'      => $content,
+					'updated_at'   => current_time( 'mysql' ),
+				),
+				array( 'id' => absint( $existing['id'] ) )
+			);
+			return $this->get_ead_lesson( $slug_val, $key_val );
+		}
+
+		$wpdb->insert(
+			$table,
+			array(
+				'agent_slug'   => $slug_val,
+				'lesson_key'   => $key_val,
+				'module_title' => $module_val,
+				'lesson_title' => $title_val,
+				'content'      => $content,
+				'created_at'   => current_time( 'mysql' ),
+				'updated_at'   => current_time( 'mysql' ),
+			)
+		);
+
+		return $this->get_ead_lesson( $slug_val, $key_val );
+	}
+
+	public function delete_ead_lesson( $agent_slug, $lesson_key ) {
+		global $wpdb;
+
+		$this->ensure_ead_lessons_table_exists();
+		$table = $wpdb->prefix . 'wpagent_ead_lessons';
+
+		return (bool) $wpdb->delete(
+			$table,
+			array(
+				'agent_slug' => sanitize_key( $agent_slug ),
+				'lesson_key' => sanitize_text_field( $lesson_key ),
+			),
+			array( '%s', '%s' )
+		);
+	}
+
+	public function get_agent_training_content_summary( $agent_slug, $max_chars = 45000 ) {
+		global $wpdb;
+
+		$slug          = sanitize_key( $agent_slug );
+		$chunks_table  = $wpdb->prefix . 'wpagent_source_chunks';
+		$sources_table = $wpdb->prefix . 'wpagent_sources';
+
+		$sources = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, attachment_id, title, filename, source_type, chunk_count, char_count, status, status_message 
+				FROM {$sources_table} 
+				WHERE agent_slug = %s 
+				ORDER BY id ASC",
+				$slug
+			),
+			ARRAY_A
+		);
+
+		if ( empty( $sources ) ) {
+			return '';
+		}
+
+		$chunks = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT c.source_id, c.chunk_index, c.page_number, c.heading, c.content, s.title AS source_title, s.filename
+				FROM {$chunks_table} c
+				INNER JOIN {$sources_table} s ON s.id = c.source_id
+				WHERE c.agent_slug = %s
+				ORDER BY c.source_id ASC, c.chunk_index ASC",
+				$slug
+			),
+			ARRAY_A
+		);
+
+		$output = '';
+
+		// If no chunks in DB, check if readable text attachments exist directly on disk
+		if ( empty( $chunks ) ) {
+			foreach ( $sources as $src ) {
+				if ( ! empty( $src['attachment_id'] ) ) {
+					$file_path = get_attached_file( $src['attachment_id'] );
+					if ( $file_path && file_exists( $file_path ) && is_readable( $file_path ) ) {
+						$ext = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+						if ( in_array( $ext, array( 'txt', 'md', 'markdown', 'csv', 'json' ), true ) ) {
+							$file_content = file_get_contents( $file_path );
+							if ( ! empty( $file_content ) ) {
+								$src_name = $src['title'] ?: $src['filename'];
+								$output .= "\n--- Documento: {$src_name} ---\n" . mb_substr( $file_content, 0, $max_chars ) . "\n";
+							}
+						}
+					}
+				}
+			}
+			return $output;
+		}
+
+		// Collect unique headings (chapters, sections, syllabus parts)
+		$headings = array();
+		foreach ( $chunks as $chunk ) {
+			$h = trim( (string) $chunk['heading'] );
+			if ( '' !== $h && ! in_array( $h, $headings, true ) ) {
+				$headings[] = $h;
+			}
+		}
+
+		if ( ! empty( $headings ) ) {
+			$output .= "### Tópicos e Capítulos Identificados no Material Didático:\n";
+			foreach ( $headings as $heading ) {
+				$output .= "- " . $heading . "\n";
+			}
+			$output .= "\n";
+		}
+
+		$output .= "### Conteúdo Estruturado dos Documentos:\n";
+		$current_source    = 0;
+		$accumulated_chars = strlen( $output );
+
+		foreach ( $chunks as $chunk ) {
+			if ( $accumulated_chars >= $max_chars ) {
+				$output .= "\n[... Demais páginas e trechos do material omitidos para respeitar o limite de contexto ...]\n";
+				break;
+			}
+
+			if ( $chunk['source_id'] !== $current_source ) {
+				$current_source = $chunk['source_id'];
+				$src_name       = $chunk['source_title'] ?: $chunk['filename'];
+				$doc_sep        = "\n--- Início do Documento: {$src_name} ---\n";
+				$output        .= $doc_sep;
+				$accumulated_chars += strlen( $doc_sep );
+			}
+
+			$chunk_head = ! empty( $chunk['heading'] ) ? "[Seção: {$chunk['heading']}]\n" : "";
+			$chunk_text = $chunk_head . $chunk['content'] . "\n\n";
+			$len        = strlen( $chunk_text );
+
+			if ( $accumulated_chars + $len > $max_chars ) {
+				$remaining = $max_chars - $accumulated_chars;
+				if ( $remaining > 300 ) {
+					$output .= substr( $chunk_text, 0, $remaining ) . "\n...";
+				}
+				break;
+			}
+
+			$output            .= $chunk_text;
+			$accumulated_chars += $len;
+		}
+
+		return $output;
 	}
 }
 }

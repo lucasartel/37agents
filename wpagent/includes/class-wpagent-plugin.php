@@ -24,8 +24,11 @@ final class WPAgent_Plugin {
 	private $shortcode;
 	private $comment_suggest;
 	private $bulk_summary;
+	private $dashboard;
 	private $content_provenance;
 	private $comment_moderation;
+	private $privacy;
+	private $blocks;
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -55,20 +58,20 @@ final class WPAgent_Plugin {
 		$this->bulk_summary       = new WPAgent_Bulk_Summary( $this->settings, $this->agents, $this->ai_client );
 		$this->content_provenance = new WPAgent_Content_Provenance();
 		$this->comment_moderation = new WPAgent_Comment_Moderation( $this->repository, $this->settings, $this->agents, $this->ai_client );
+		$this->privacy            = new WPAgent_Privacy();
+		$this->blocks             = new WPAgent_Blocks( $this->agents, $this->shortcode );
 	}
 
 	public function boot() {
 		if ( get_option( 'wpagent_schema_version' ) !== WPAGENT_VERSION ) {
+			if ( $this->repository ) {
+				$this->repository->ensure_projects_table_exists( true );
+				$this->repository->ensure_email_schedules_tables_exist( true );
+				$this->repository->ensure_periodic_contents_table_exists( true );
+				$this->repository->ensure_user_progress_table_exists( true );
+				$this->repository->ensure_ead_lessons_table_exists( true );
+			}
 			WPAgent_Activator::activate();
-		}
-		if ( $this->repository && method_exists( $this->repository, 'ensure_projects_table_exists' ) ) {
-			$this->repository->ensure_projects_table_exists();
-		}
-		if ( $this->repository && method_exists( $this->repository, 'ensure_email_schedules_tables_exist' ) ) {
-			$this->repository->ensure_email_schedules_tables_exist();
-		}
-		if ( $this->repository && method_exists( $this->repository, 'ensure_periodic_contents_table_exists' ) ) {
-			$this->repository->ensure_periodic_contents_table_exists();
 		}
 		$this->dashboard->register();
 		$this->wordpress_ai_integration->register();
@@ -86,6 +89,8 @@ final class WPAgent_Plugin {
 		$this->bulk_summary->register();
 		$this->content_provenance->register();
 		$this->comment_moderation->register();
+		$this->privacy->register();
+		$this->blocks->register();
 
 		add_action( 'rest_api_init', array( $this->rest_controller, 'register_routes' ) );
 		add_action( 'admin_enqueue_scripts', array( 'WPAgent_Admin_UI', 'enqueue_styles' ) );

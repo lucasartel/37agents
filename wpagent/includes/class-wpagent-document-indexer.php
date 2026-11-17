@@ -146,6 +146,146 @@ class WPAgent_Document_Indexer {
 		return $source_id;
 	}
 
+	public function index_wp_post( $agent_post_id, $agent_slug, $content_post ) {
+		if ( is_numeric( $content_post ) ) {
+			$content_post = get_post( absint( $content_post ) );
+		}
+
+		if ( ! ( $content_post instanceof WP_Post ) || 'publish' !== $content_post->post_status ) {
+			return 0;
+		}
+
+		$title     = trim( wp_strip_all_tags( get_the_title( $content_post ) ) );
+		$permalink = get_permalink( $content_post );
+		$body      = $this->clean_text( strip_shortcodes( $content_post->post_content ) );
+		$excerpt   = $this->clean_text( $content_post->post_excerpt );
+
+		$sections = array();
+		if ( '' !== $title ) {
+			$sections[] = 'Título: ' . $title;
+		}
+		if ( ! empty( $permalink ) ) {
+			$sections[] = 'URL: ' . esc_url_raw( $permalink );
+		}
+		$sections[] = 'Tipo: ' . sanitize_key( $content_post->post_type );
+
+		$tax_terms = array();
+		$taxonomies = get_object_taxonomies( $content_post->post_type );
+		foreach ( (array) $taxonomies as $tax ) {
+			$terms = wp_get_post_terms( $content_post->ID, $tax, array( 'fields' => 'names' ) );
+			if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
+				$tax_terms = array_merge( $tax_terms, $terms );
+			}
+		}
+		if ( ! empty( $tax_terms ) ) {
+			$sections[] = 'Categorias/Tags: ' . implode( ', ', array_unique( array_map( 'sanitize_text_field', $tax_terms ) ) );
+		}
+
+		if ( 'product' === $content_post->post_type ) {
+			$sku          = get_post_meta( $content_post->ID, '_sku', true );
+			$price        = get_post_meta( $content_post->ID, '_price', true );
+			$regular      = get_post_meta( $content_post->ID, '_regular_price', true );
+			$stock_status = get_post_meta( $content_post->ID, '_stock_status', true );
+			$woo_parts    = array();
+			if ( '' !== (string) $sku ) {
+				$woo_parts[] = 'SKU: ' . sanitize_text_field( $sku );
+			}
+			if ( '' !== (string) $price ) {
+				$woo_parts[] = 'Preço: ' . sanitize_text_field( $price );
+			} elseif ( '' !== (string) $regular ) {
+				$woo_parts[] = 'Preço: ' . sanitize_text_field( $regular );
+			}
+			if ( '' !== (string) $stock_status ) {
+				$woo_parts[] = 'Estoque: ' . sanitize_text_field( $stock_status );
+			}
+			if ( ! empty( $woo_parts ) ) {
+				$sections[] = implode( ' | ', $woo_parts );
+			}
+		}
+
+		if ( '' !== $excerpt ) {
+			$sections[] = 'Resumo: ' . $excerpt;
+		}
+		if ( '' !== $body ) {
+			$sections[] = "\n" . $body;
+		}
+
+		$full_text = trim( implode( "\n", $sections ) );
+		if ( '' === $full_text ) {
+			return 0;
+		}
+
+		$source_id = $this->repository->upsert_training_source(
+			array(
+				'agent_slug'     => $agent_slug,
+				'post_id'        => absint( $agent_post_id ),
+				'attachment_id'  => absint( $content_post->ID ),
+				'source_type'    => 'wp_post',
+				'title'          => $title ?: ( '#' . absint( $content_post->ID ) ),
+				'filename'       => sanitize_key( $content_post->post_type ) . '-' . absint( $content_post->ID ),
+				'url'            => $permalink ? esc_url_raw( $permalink ) : '',
+				'mime'           => 'text/plain',
+				'status'         => 'processing',
+				'status_message' => __( 'Indexando conteúdo publicado do WordPress.', 'wpagent' ),
+			)
+		);
+
+		if ( ! $source_id ) {
+			return 0;
+		}
+
+		$chunks = $this->chunk_text( $full_text, 'text/plain' );
+		$this->repository->replace_source_chunks( $source_id, $agent_slug, $chunks );
+		$this->repository->mark_training_source(
+			$source_id,
+			'indexed',
+			sprintf(
+				/* translators: %d: number of indexed chunks. */
+				__( '%d trechos indexados automaticamente do WordPress.', 'wpagent' ),
+				count( $chunks )
+			),
+			array(
+				'chunk_count' => count( $chunks ),
+				'char_count'  => strlen( $full_text ),
+			)
+		);
+
+		return $source_id;
+	}
+
+	public function sync_agent_wp_posts( $agent_post_id, $agent_slug, array $post_types, $limit = 50 ) {
+		$post_types = array_values(
+			array_diff(
+				array_filter( array_map( 'sanitize_key', $post_types ) ),
+				array( 'wpagent_agent', 'attachment', 'revision', 'nav_menu_item' )
+			)
+		);
+
+		if ( empty( $post_types ) ) {
+			return 0;
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'      => $post_types,
+				'post_status'    => 'publish',
+				'posts_per_page' => max( 1, min( 200, absint( $limit ) ) ),
+				'orderby'        => 'modified',
+				'order'          => 'DESC',
+				'no_found_rows'  => true,
+			)
+		);
+
+		$count = 0;
+		foreach ( $posts as $wp_post ) {
+			if ( $this->index_wp_post( $agent_post_id, $agent_slug, $wp_post ) ) {
+				$count++;
+			}
+		}
+
+		return $count;
+	}
+
 	public function extract_text( $path, $mime ) {
 		if ( empty( $path ) || ! file_exists( $path ) ) {
 			return new WP_Error( 'wpagent_missing_file', __( 'Arquivo nao encontrado para indexacao.', 'wpagent' ) );

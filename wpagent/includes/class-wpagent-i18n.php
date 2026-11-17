@@ -6,8 +6,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! class_exists( 'WPAgent_I18n' ) ) {
 class WPAgent_I18n {
+	private static $catalog_cache = null;
+
 	public static function register() {
-		add_action( 'plugins_loaded', array( __CLASS__, 'load_textdomain' ) );
+		add_action( 'init', array( __CLASS__, 'load_textdomain' ), 1 );
 		add_filter( 'gettext', array( __CLASS__, 'translate' ), 10, 3 );
 	}
 
@@ -126,14 +128,18 @@ class WPAgent_I18n {
 			'tokensThisMonth'          => __( 'Tokens este mes', 'wpagent' ),
 			'tokensUnlimited'          => __( ' / Ilimitado', 'wpagent' ),
 			'tokenLimitExceeded'       => __( 'Limite de tokens mensal atingido. Entre em contato com o administrador.', 'wpagent' ),
+			'leadCaptureTitle'         => __( 'Identifique-se para receber acompanhamento', 'wpagent' ),
+			'leadNamePlaceholder'      => __( 'Seu nome', 'wpagent' ),
+			'leadEmailPlaceholder'     => __( 'Seu melhor e-mail', 'wpagent' ),
+			'leadSubmit'               => __( 'Continuar', 'wpagent' ),
+			'leadSaved'                => __( 'Dados recebidos! Você já pode conversar normalmente.', 'wpagent' ),
+			'leadInvalidEmail'         => __( 'Informe um e-mail válido.', 'wpagent' ),
 		);
 	}
 
 	private static function catalog() {
-		static $catalog = null;
-
-		if ( null !== $catalog ) {
-			return $catalog;
+		if ( null !== self::$catalog_cache ) {
+			return self::$catalog_cache;
 		}
 
 		$catalog = array(
@@ -2308,7 +2314,9 @@ class WPAgent_I18n {
 			),
 		);
 
-		return $catalog;
+		self::$catalog_cache = $catalog;
+
+		return self::$catalog_cache;
 	}
 }
 }
