@@ -3,8 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>WPAgent - Agentes de IA para WordPress</title>
-	<meta name="description" content="WPAgent é um plugin gratuito para criar agentes de IA no WordPress com memória, documentos de treinamento, WordPress AI Connectors e OpenRouter.">
+	<title>37agents - Agentes de IA para WordPress</title>
+	<meta name="description" content="37agents é um plugin gratuito para criar agentes de IA no WordPress com Chat SSE, STEPS, EAD (LMS), Auto-RAG, bloco Gutenberg, LGPD, OpenRouter, WordPress AI Connectors e planos compatíveis.">
 	<style>
 		:root {
 			--bg: #050608;
@@ -45,6 +45,14 @@
 			text-decoration: none;
 		}
 
+		code {
+			background: rgba(255, 255, 255, 0.08);
+			border-radius: 4px;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 0.9em;
+			padding: 2px 6px;
+		}
+
 		.page-shell {
 			background:
 				linear-gradient(rgba(255, 255, 255, 0.034) 1px, transparent 1px),
@@ -57,20 +65,21 @@
 		.nav {
 			align-items: center;
 			backdrop-filter: blur(18px);
-			background: rgba(5, 6, 8, 0.8);
+			background: rgba(5, 6, 8, 0.85);
 			border-bottom: 1px solid var(--line);
 			display: flex;
 			gap: 24px;
 			justify-content: space-between;
-			padding: 16px max(24px, calc((100vw - 1180px) / 2));
+			padding: 14px max(24px, calc((100vw - 1180px) / 2));
 			position: sticky;
 			top: 0;
 			z-index: 20;
 		}
 
+		.logo svg,
 		.logo img {
 			display: block;
-			height: 52px;
+			height: 46px;
 			object-fit: contain;
 			width: auto;
 		}
@@ -123,7 +132,7 @@
 		.hero {
 			display: grid;
 			gap: 44px;
-			grid-template-columns: minmax(0, 1.02fr) minmax(360px, 0.98fr);
+			grid-template-columns: minmax(0, 1.05fr) minmax(350px, 0.95fr);
 			margin: 0 auto;
 			max-width: 1180px;
 			min-height: calc(100vh - 85px);
@@ -133,6 +142,17 @@
 		.hero-copy {
 			align-self: center;
 			min-width: 0;
+		}
+
+		.hero-brand-lockup {
+			margin-bottom: 22px;
+		}
+
+		.hero-brand-lockup svg {
+			display: block;
+			height: 58px;
+			max-width: 100%;
+			width: auto;
 		}
 
 		.eyebrow {
@@ -146,30 +166,30 @@
 		}
 
 		h1 {
-			font-size: clamp(42px, 6vw, 76px);
+			font-size: clamp(40px, 5.6vw, 68px);
 			letter-spacing: 0;
-			line-height: 0.98;
+			line-height: 1.02;
 			margin: 0;
 			max-width: 820px;
 		}
 
 		h2 {
-			font-size: clamp(32px, 4vw, 52px);
+			font-size: clamp(32px, 4vw, 50px);
 			letter-spacing: 0;
-			line-height: 1.05;
+			line-height: 1.06;
 			margin: 0;
 		}
 
 		h3 {
 			font-size: 18px;
-			line-height: 1.22;
+			line-height: 1.24;
 			margin: 0;
 		}
 
 		.lead {
 			color: var(--muted);
-			font-size: clamp(18px, 2vw, 22px);
-			margin: 24px 0 0;
+			font-size: clamp(17px, 2vw, 21px);
+			margin: 22px 0 0;
 			max-width: 700px;
 		}
 
@@ -178,7 +198,7 @@
 			display: flex;
 			flex-wrap: wrap;
 			gap: 12px;
-			margin-top: 32px;
+			margin-top: 30px;
 		}
 
 		.hero-proof {
@@ -186,7 +206,7 @@
 			display: flex;
 			flex-wrap: wrap;
 			gap: 10px;
-			margin-top: 32px;
+			margin-top: 30px;
 		}
 
 		.hero-proof span,
@@ -279,7 +299,7 @@
 			border-top: 1px solid var(--line);
 			color: var(--muted);
 			display: grid;
-			gap: 10px;
+			gap: 8px;
 			font-size: 13px;
 			padding-top: 18px;
 		}
@@ -331,6 +351,12 @@
 			margin: 11px 0 0;
 		}
 
+		.use-card {
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
+		}
+
 		.use-card h3 a {
 			color: var(--text);
 			text-decoration: none;
@@ -342,6 +368,7 @@
 
 		.use-card .project-link {
 			align-items: center;
+			align-self: flex-start;
 			background: rgba(255, 255, 255, 0.06);
 			border: 1px solid var(--line);
 			border-radius: 8px;
@@ -405,19 +432,13 @@
 			margin-bottom: 18px;
 		}
 
-		.two-col {
+		.use-grid {
 			display: grid;
-			gap: 18px;
-			grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+			gap: 14px;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 			margin-top: 34px;
 		}
 
-		.stack {
-			display: grid;
-			gap: 14px;
-		}
-
-		.use-grid,
 		.safety-grid {
 			display: grid;
 			gap: 14px;
@@ -425,37 +446,114 @@
 			margin-top: 34px;
 		}
 
-		.list-card {
-			background: #101217;
-			border: 1px solid var(--line);
-			border-radius: 8px;
-			padding: 24px;
-		}
-
-		.list-card ul {
-			color: var(--muted);
+		.plans-grid {
 			display: grid;
-			gap: 10px;
-			list-style: none;
-			margin: 18px 0 0;
-			padding: 0;
+			gap: 20px;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			margin-top: 34px;
 		}
 
-		.list-card li {
-			font-size: 14px;
-			padding-left: 21px;
+		.plan-card {
+			background: rgba(16, 18, 23, 0.92);
+			border: 1px solid var(--line);
+			border-radius: 12px;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
+			min-width: 0;
+			padding: 32px;
 			position: relative;
 		}
 
-		.list-card li::before {
+		.plan-card--featured {
+			background: linear-gradient(180deg, rgba(20, 199, 222, 0.08) 0%, rgba(16, 18, 23, 0.96) 100%);
+			border: 2px solid var(--cyan);
+		}
+
+		.plan-ribbon {
 			background: var(--cyan);
-			border-radius: 99px;
-			content: "";
-			height: 7px;
-			left: 0;
+			border-radius: 999px;
+			color: #050608;
+			font-size: 11px;
+			font-weight: 900;
+			letter-spacing: 0.05em;
+			padding: 4px 12px;
 			position: absolute;
-			top: 8px;
-			width: 7px;
+			right: 24px;
+			text-transform: uppercase;
+			top: -13px;
+		}
+
+		.plan-tag {
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid var(--line);
+			border-radius: 999px;
+			color: var(--muted);
+			display: inline-block;
+			font-size: 12px;
+			font-weight: 700;
+			margin-bottom: 16px;
+			padding: 4px 12px;
+		}
+
+		.plan-card--featured .plan-tag {
+			background: rgba(20, 199, 222, 0.14);
+			border-color: rgba(20, 199, 222, 0.34);
+			color: var(--cyan);
+		}
+
+		.plan-price {
+			color: #fff;
+			font-size: 36px;
+			font-weight: 900;
+			margin: 20px 0 6px;
+		}
+
+		.plan-price small {
+			color: var(--muted);
+			font-size: 15px;
+			font-weight: 500;
+		}
+
+		.plan-note {
+			color: var(--green);
+			font-size: 13px;
+			font-weight: 700;
+			margin-bottom: 20px;
+		}
+
+		.plan-list {
+			color: var(--soft);
+			display: grid;
+			gap: 10px;
+			font-size: 14px;
+			list-style: none;
+			margin: 0 0 28px;
+			padding: 0;
+		}
+
+		.transparency-box {
+			background: rgba(16, 18, 23, 0.88);
+			border: 1px solid var(--line);
+			border-left: 4px solid var(--cyan);
+			border-radius: 8px;
+			margin-top: 24px;
+			padding: 24px 28px;
+		}
+
+		.transparency-box p {
+			color: var(--muted);
+			font-size: 15px;
+			margin: 10px 0 14px;
+		}
+
+		.transparency-badges {
+			color: var(--green);
+			display: flex;
+			flex-wrap: wrap;
+			font-size: 13px;
+			font-weight: 700;
+			gap: 18px;
 		}
 
 		.integrations {
@@ -572,9 +670,9 @@
 			}
 
 			.hero,
-			.two-col,
 			.integrations,
-			.download-band {
+			.download-band,
+			.plans-grid {
 				grid-template-columns: 1fr;
 			}
 
@@ -598,8 +696,9 @@
 		}
 
 		@media (max-width: 640px) {
+			.logo svg,
 			.logo img {
-				height: 42px;
+				height: 36px;
 			}
 
 			.nav {
@@ -640,35 +739,52 @@
 <body>
 	<div class="page-shell">
 		<header class="nav">
-			<a class="logo" href="#top" aria-label="WPAgent">
-				<img src="logo-WPagents-nav.png" alt="WPAgent">
+			<a class="logo" href="#top" aria-label="37agents">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 408.59 143.85" width="168" height="59" role="img" aria-label="37agents">
+					<defs>
+						<linearGradient id="g37-nav-metallic-pink" x1="10%" y1="95%" x2="90%" y2="5%" gradientUnits="objectBoundingBox">
+							<stop offset="0%" stop-color="#2b3446"/>
+							<stop offset="26%" stop-color="#5b6786"/>
+							<stop offset="45%" stop-color="#98a4c2"/>
+							<stop offset="60%" stop-color="#676273"/>
+							<stop offset="76%" stop-color="#c91b8b"/>
+							<stop offset="90%" stop-color="#fa26a2"/>
+							<stop offset="100%" stop-color="#ff5cba"/>
+						</linearGradient>
+					</defs>
+					<path fill="url(#g37-nav-metallic-pink)" d="M16 25.21L19.71 41C23.15 39.64 26.3 37.68 29.92 36.78C39.21 34.49 55.61 32.5 58.05 45.17C58.41 47.03 57.98 48.89 57.41 50.63C54.42 59.85 43.98 63.42 35.29 64.78C32.24 65.26 28.81 64.76 25.75 64.99L22.63 80.98C29.9 81.37 38.93 80.77 45.24 85.28C53.88 91.45 54.16 101.8 48.16 110.02C46.47 112.33 43.84 113.95 41.48 115.43L38.24 116.87L37.84 117.64C38.34 117.58 39 117.91 39.58 117.82C42.36 117.4 45.1 116.5 47.86 115.95C55.97 114.33 64.05 112.63 72.16 111.01C72.93 108.41 74.06 105.94 74.49 103.19C76.16 92.49 71.89 81.63 62.54 75.77C60.02 74.19 57.32 73.72 54.61 72.79C55.68 72.26 57.1 72.17 58.24 71.74C61.68 70.43 65.28 68.7 68.25 66.53C76.67 60.39 82.08 50.48 80.36 40.01C79.83 36.79 79 33.25 77.02 30.48C66.71 16.04 46.67 16 31.09 19.23C27.15 20.05 23.25 21.79 19.51 23.26C18.29 23.73 17.17 24.76 16 25.21Z M88.54 17.8L84.45 36.32L134.95 36.52L89.32 107.89L115.65 103.79C126.09 86.91 136.16 69.78 146.71 52.96C149.92 47.84 152.95 42.59 156.22 37.5C157.26 35.88 158.9 34.03 159.45 32.15C160.8 27.45 161.14 22.31 162.06 17.6L88.54 17.8Z"/>
+					<path fill="#b4b4b4" fill-rule="evenodd" d="M336.23 55.52C335.44 57.44 333.63 63.11 332.37 64.38C331.12 65.62 329.11 66.22 327.66 67.22C327.23 67.51 327.11 67.99 326.76 68.32C326.41 69.51 326.23 71.67 327.07 72.68C328.63 73.37 330.45 72.45 331.88 73.46C331.96 77.55 332.04 81.79 332.04 85.94C332.04 92.84 330.85 102.64 338.41 106.17C341.31 107.52 344.71 107.44 347.82 107.33C349.89 107.25 352.18 106.86 354.15 106.2C354.79 105.99 355.29 105.34 355.88 105.15C356.38 102.79 356.44 99.73 355.88 97.38C355.55 97.42 355.02 97.12 354.58 97.16C351.47 97.46 348.09 99.22 345.22 97C343.27 95.49 343.71 92.52 343.71 90.36C343.71 84.7 343.69 78.93 343.92 73.35C347.48 72.32 351.57 73.6 355.17 72.68C355.89 70.6 356.04 66.5 355.1 64.5C351.61 63.66 347.72 64.63 344.18 63.93C342.95 61.46 344.21 58.19 343.4 55.57C341.81 54.59 337.88 54.7 336.23 55.52Z M150.88 67.22C151.18 69.52 152.69 72.5 154.12 74.38C154.51 74.31 154.97 74.52 155.42 74.41C157.47 73.92 159.38 72.89 161.42 72.37C164.82 71.5 171.25 71.26 172.32 75.67C172.56 76.64 172.77 78.06 172.59 79.07L172.2 79.96C172.03 79.97 171.77 80.24 171.54 80.27L165.56 80.39C158.39 80.64 149.51 81.93 147.12 89.77C146.42 92.06 146.16 94.38 146.57 96.79C148.29 106.71 158.55 109.69 167.2 106.2C169.61 105.22 170.96 103.27 172.84 101.66C173.15 101.39 173.61 101.42 173.88 101.22L176.22 106.19C177.46 106.97 182.41 106.87 183.76 106.33C183.78 105.95 184.13 105.4 184.16 104.92L184.15 86.98C184.18 76.16 185.28 65.53 171.54 63.74C168.35 63.33 165.12 63.36 161.92 63.66C158.63 63.97 155.27 64.9 152.23 66.21C151.73 66.42 151.32 67.06 150.88 67.22Z M198.5 90.36C193.09 94.78 192.03 97.68 197.14 103.1C195.8 104.75 193.18 105.17 191.51 106.81C187.25 111.02 188.25 118 192.68 121.6C200.36 127.85 222.27 126.2 228.36 117.93C229.66 116.16 230.51 114.12 230.73 111.94C230.91 110.11 230.88 108.31 230.64 106.48C230.45 105.02 229.67 103.56 228.78 102.41C223.89 96.06 214.89 98.25 207.94 97.73C206.85 97.65 205.29 97.5 204.33 96.96C204.14 96.85 203.6 96.09 203.51 96.08C203.7 95.85 202.66 93.64 204.85 92.58C205.7 92.16 210.57 92.69 212.1 92.5C219.83 91.53 226.13 87.56 226.64 79.18C226.74 77.59 226.61 75.92 226.14 74.39L225.41 72.68C225.35 72.34 225.58 71.92 225.53 71.64L231.36 69.82C231.71 68.37 231.95 65.71 231.08 64.43C226.49 64.32 221.67 64.44 217.04 64.16C214.43 64 211.88 63.48 209.24 63.48C200.03 63.51 192.07 67.36 192.04 77.62C192.03 79.86 192.4 81.82 193.17 83.9C194.18 86.67 196.7 88.29 198.5 90.36Z M270.88 104.14C271.3 101.99 271.63 98.06 270.7 96.08C270.38 96.16 269.83 95.98 269.43 96.08C267.53 96.54 265.72 97.45 263.82 97.95C258.39 99.38 250.57 99.4 247.46 93.89C246.81 92.73 246.11 90.92 246.18 89.58C246.19 89.35 246.45 88.84 246.42 88.67C246.62 88.65 246.95 88.39 247.2 88.35L254.74 88.34C260.8 88.34 266.97 88.47 272.94 88.12C272.93 88.03 273.35 87.41 273.37 87.24L273.38 84.9C273.38 79.65 273 74.57 269.88 70.14C264.78 62.91 252.9 61.66 245.29 65.16C241.71 66.81 238.75 69.73 236.97 73.23C235.19 76.7 234.67 80.52 234.53 84.38C234.13 96.16 239.51 105.14 251.62 107.13C256.42 107.91 261.93 107.49 266.61 106.23C267.59 105.97 269.15 105.5 269.98 104.93L270.88 104.14Z M292.18 69.2C290.51 68.1 291.04 65.76 289.58 64.32L281.82 64.36C281.79 64.75 281.43 65.2 281.4 65.66L281.44 105.44C281.47 105.81 281.81 106.2 281.83 106.48C285.18 106.79 289.47 107.08 292.7 106.31C292.75 103.99 292.93 101.58 292.93 99.2L292.93 89.06C292.93 82.33 292.8 72.5 302.06 72.61C306.96 72.67 308.52 76.2 308.78 80.48C309.29 88.51 308.64 96.62 308.85 104.66C308.87 105.19 309.18 105.78 309.19 106.22C311.68 107.08 317.46 106.94 320 106.31C320.02 105.92 320.35 105.39 320.37 104.92L320.37 86.72C320.37 75.56 321.19 63.96 306.48 63.51C304.41 63.44 302.1 63.46 300.11 64.1C295.97 65.45 295.26 67.03 292.18 69.2Z M381.19 94.78C380.7 95.99 381.17 96.55 379.95 97.65C379.25 98.28 378.34 98.36 377.46 98.56C373.42 99.45 368.87 98.22 364.98 97.05L362.12 96.01C361.68 95.91 361.15 96.12 360.82 96.06C360.12 97.92 360.24 102.89 360.82 104.83C361.71 105.05 362.77 105.75 363.68 106.08L368.1 107.1C375.51 108.36 388.85 107.62 391.74 99.01C392.27 97.44 392.56 95.66 392.56 94C392.59 85.08 385.23 82.64 378.31 79.73C376.64 79.03 374.74 78.4 373.34 77.21C372.65 76.64 372.1 75.78 372 74.88C371.98 74.68 372.27 73.65 372.26 73.64C372.71 73.27 373.08 72.64 373.63 72.4C377.85 70.55 384.31 73.64 388.38 74.66C389.71 73.26 391.82 68.56 391.57 66.7C391.4 66.65 391.14 66.27 390.9 66.17C388.75 65.25 386.39 64.59 384.11 64.1C376.76 62.51 363.74 62.96 360.91 71.64C360.35 73.34 360.39 75.31 360.55 77.06C361.37 85.97 371.19 87.53 377.57 91.16C378.52 91.69 379.61 92.25 380.31 93.11C380.59 93.46 380.92 94.58 381.19 94.78Z M208.2 70.33C206.54 71.57 205.2 70.84 203.75 73.52C203.41 74.15 203.41 75 203.26 75.68C202.2 80.75 204.6 86.63 210.75 85.44C216.33 84.35 217.04 75.62 213.71 71.97C212.72 70.88 210.95 70.3 209.5 70.28L208.2 70.33Z M246.64 80.22C250.73 80.97 258.2 80.99 262.29 80.22C262.25 79.99 262.52 79.49 262.52 79.18C262.5 78.22 261.99 76.46 261.53 75.62C258.56 70.27 250.15 70.26 247.42 75.86C247.01 76.7 246.49 78.25 246.44 79.18C246.43 79.49 246.68 79.99 246.64 80.22Z M172.32 87.12C172.17 87.13 171.76 86.87 171.54 86.85C167.09 86.47 159.69 87.4 158.52 92.5C158.21 93.84 158.19 95.8 159.09 96.97C159.83 97.93 160.8 98.26 161.92 98.54C165.97 99.55 170.36 97.8 172.07 93.9C172.78 92.3 172.69 90 172.62 88.28C172.6 87.92 172.32 87.42 172.32 87.12Z M205.86 107.25C204.99 107.64 203.71 107.33 202.76 107.69C199.82 108.82 197.09 112.62 199.92 115.42C204.06 119.5 218.95 118.52 220.74 112.16C222.53 105.75 209.07 107.27 205.86 107.25Z"/>
+				</svg>
 			</a>
 			<nav class="nav-links" aria-label="Navegação principal">
-				<a href="#download">Download</a>
 				<a href="#funcionalidades">Funcionalidades</a>
 				<a href="#como-funciona">Como funciona</a>
+				<a href="#integracoes">Provedores</a>
+				<a href="#usos">Casos de uso</a>
+				<a href="#planos">Planos</a>
 				<a href="#seguranca">Segurança</a>
 			</nav>
-			<a class="button button-secondary" href="https://github.com/lucasartel/wpagent/releases/latest">Baixar</a>
+			<a class="button button-secondary" href="https://github.com/lucasartel/37agents">Baixar v0.8.0</a>
 		</header>
 
 		<main id="top">
 			<section class="hero">
 				<div class="hero-copy">
-					<span class="eyebrow">Plugin gratuito e de código aberto</span>
-					<h1>Agentes de IA para WordPress com memória, documentos e múltiplos provedores.</h1>
-					<p class="lead">WPAgent transforma qualquer site WordPress em uma plataforma de assistentes treinados com conteúdo próprio, conversas persistentes, perfis de usuário, RAG com documentos e integração com WordPress AI / Connectors ou OpenRouter.</p>
+					<span class="eyebrow">Plugin gratuito e código aberto • Novo nome: 37agents</span>
+					<h1>Agentes de IA para WordPress com Chat SSE, STEPS, EAD e Auto-RAG.</h1>
+					<p class="lead">O antigo WPAgent evoluiu para <strong>37agents</strong>: crie assistentes treinados automaticamente com conteúdo WordPress (Auto-RAG) e documentos, memória persistente, bloco Gutenberg nativo, LGPD integrada e suporte a WordPress AI Connectors, OpenRouter e Planos de IA (Xiaomi MiMo, Qwen, GLM, Kimi, DeepSeek).</p>
 					<div class="hero-actions">
-						<a class="button button-primary" href="https://github.com/lucasartel/wpagent/releases/latest/download/wpagent-0.4.15.zip">Baixar última versão</a>
-						<a class="button button-secondary" href="https://github.com/lucasartel/wpagent">Ver no GitHub</a>
-						<a class="button button-ghost" href="#funcionalidades">Explorar recursos</a>
+						<a class="button button-primary" href="#planos">Baixar Grátis (BYOK)</a>
+						<a class="button button-secondary" href="#vip-setup">Setup &amp; Suporte VIP</a>
+						<a class="button button-ghost" href="https://github.com/lucasartel/37agents" target="_blank" rel="noopener noreferrer">Ver no GitHub</a>
 					</div>
 					<div class="hero-proof" aria-label="Principais recursos">
 						<span>GPL-2.0-or-later</span>
-						<span>WordPress AI</span>
-						<span>OpenRouter</span>
-						<span>RAG com documentos</span>
-						<span>Memória por usuário</span>
+						<span>Streaming SSE</span>
+						<span>Auto-RAG WP &amp; Woo</span>
+						<span>Gutenberg Block</span>
+						<span>Planos IA &amp; OpenRouter</span>
+						<span>LGPD / GDPR</span>
 					</div>
 				</div>
 
@@ -679,19 +795,19 @@
 					</div>
 					<div class="release-panel">
 						<div class="release-number">
-							<strong>v0.4.15</strong>
+							<strong>v0.8.0</strong>
 							<span>Disponível agora</span>
 						</div>
-						<p>Baixe o ZIP instalável e envie pelo painel do WordPress em Plugins > Adicionar novo > Enviar plugin.</p>
-						<div class="command">wpagent-0.4.15.zip</div>
+						<p>Baixe o ZIP instalável e envie pelo painel do WordPress em Plugins &gt; Adicionar novo &gt; Enviar plugin.</p>
+						<div class="command">37agents-0.8.0.zip</div>
 						<div class="release-links">
-							<a class="button button-primary" href="https://github.com/lucasartel/wpagent/releases/latest/download/wpagent-0.4.15.zip">Download ZIP</a>
-							<a class="button button-secondary" href="https://github.com/lucasartel/wpagent/releases/latest">Notas da versão</a>
+							<a class="button button-primary" href="https://github.com/lucasartel/37agents">Download no GitHub</a>
+							<a class="button button-secondary" href="https://github.com/lucasartel/37agents/releases">Notas da versão</a>
 						</div>
 						<div class="release-meta">
-							<span>Repositório: github.com/lucasartel/wpagent</span>
-							<span>Licença: GPL-2.0-or-later</span>
-							<span>Requer WordPress 7.0 e PHP 7.4+</span>
+							<span>Repositório: github.com/lucasartel/37agents</span>
+							<span>Compatibilidade: [37agents_chat] e [wpagent_chat]</span>
+							<span>Licença: GPL-2.0-or-later • Requer WP 6.2+ e PHP 7.4+</span>
 						</div>
 					</div>
 				</aside>
@@ -699,86 +815,86 @@
 
 			<section class="section" id="funcionalidades">
 				<div class="section-heading">
-					<span class="eyebrow">Funcionalidades</span>
-					<h2>Mais que um chatbot: uma camada de agentes para WordPress.</h2>
-					<p>Cada agente pode ter comportamento, base de conhecimento, histórico, memória, provedor e regras próprias. O mesmo plugin serve para Educadoria, HomilyAI, atendimento público, suporte interno e produtos digitais.</p>
+					<span class="eyebrow">Funcionalidades v0.8.0</span>
+					<h2>Mais que um chatbot: uma plataforma completa de IA agêntica no WordPress.</h2>
+					<p>Cada agente tem comportamento, layout, base Auto-RAG, memória, provedor, privacidade e limites próprios — servindo de atendimento e vendas até diagnósticos interativos e cursos EAD com Tutor IA.</p>
 				</div>
 
 				<div class="feature-grid">
 					<article class="feature">
 						<span class="feature-icon">01</span>
-						<h3>Multiagentes configuráveis</h3>
-						<p>Crie agentes independentes com slug, prompt, shortcode, provedor, modelo, limites e treinamento próprio.</p>
+						<h3>Multiagentes &amp; Templates 1-Clique</h3>
+						<p>Crie agentes independentes ou comece em 1 clique com os Starter Templates: Atendimento, Diagnóstico (STEPS), Tutor EAD e Copiloto Editorial.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">02</span>
-						<h3>Chat por shortcode</h3>
-						<p>Adicione qualquer agente a uma página ou post com `[wpagent_chat agent="default"]`.</p>
+						<h3>Bloco Gutenberg &amp; Shortcodes</h3>
+						<p>Use o bloco visual <code>Agent Widget (37agents)</code> com preview de tema e layout, <code>[37agents_chat]</code> ou o legado <code>[wpagent_chat]</code>.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">03</span>
-						<h3>Upload de documentos</h3>
-						<p>Indexe TXT, Markdown, CSV, JSON, HTML, DOCX, PDF com texto e conteúdo colado manualmente.</p>
+						<h3>Streaming em Tempo Real (SSE)</h3>
+						<p>Respostas progressivas via Server-Sent Events (<code>/wpagent/v1/chat/stream</code>) com renderização Markdown segura e fallback JSON automático.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">04</span>
-						<h3>RAG por chunks</h3>
-						<p>O plugin busca trechos relevantes da base antes de enviar contexto para o modelo.</p>
+						<h3>Layout STEPS (Diagnóstico Guiado)</h3>
+						<p>Questionário interativo passo a passo com persistência de progresso e geração automática de relatório final estruturado por IA.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">05</span>
-						<h3>Embeddings opcionais</h3>
-						<p>Gere embeddings em lotes via WP-Cron e use busca semântica antes do fallback por palavra-chave.</p>
+						<h3>Layout EAD / LMS com Tutor IA</h3>
+						<p>Ambiente virtual com módulos e aulas, gerador de ementa por IA em 1 clique, progresso do aluno e Tutor IA contextualizado em cada aula.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">06</span>
-						<h3>Memória por usuário</h3>
-						<p>O agente pode considerar memórias persistentes e interações recentes para respostas mais pessoais.</p>
+						<h3>Auto-RAG de Conteúdo WordPress</h3>
+						<p>Indexação automática de posts, páginas, produtos WooCommerce e Custom Post Types ao publicar ou via sincronização manual no painel.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">07</span>
-						<h3>Perfil declarado</h3>
-						<p>Configure campos estruturados por agente, como turma, área de atuação, objetivos e preferências.</p>
+						<h3>Upload de Documentos &amp; Embeddings</h3>
+						<p>Indexe TXT, Markdown, CSV, JSON, HTML, DOCX e PDFs, com busca semântica opcional por embeddings em lotes via WP-Cron.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">08</span>
-						<h3>Conversas salvas</h3>
-						<p>Usuários logados podem criar, renomear, alternar e apagar conversas por agente.</p>
+						<h3>Planos de IA &amp; OpenAI-Compatíveis</h3>
+						<p>Presets nativos para Xiaomi MiMo Token Plan, Qwen Coding Plan, Zhipu GLM / Z.ai, Kimi Code, MiniMax, Volcengine Ark, DeepSeek e SiliconFlow.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">09</span>
-						<h3>Assistente público</h3>
-						<p>Ative um pop-up no front-end para visitantes, com permissão explícita e rate limit.</p>
+						<h3>Memória &amp; Abas de Projetos</h3>
+						<p>Memória persistente por usuário, perfil estruturado por agente e abas de projetos independentes para organizar clientes ou demandas no front-end.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">10</span>
-						<h3>Assistente do admin</h3>
-						<p>Disponibilize um agente interno no painel para apoiar rotinas editoriais e operacionais.</p>
+						<h3>Captação de Leads &amp; Webhooks</h3>
+						<p>Barra opcional de captura de leads para visitantes e webhooks SSRF-safe (<code>lead_captured</code>, <code>conversation_started</code>, <code>steps_report_generated</code>).</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">11</span>
-						<h3>Relatórios e tokens</h3>
-						<p>Acompanhe consumo e defina limites diários, semanais e mensais por agente.</p>
+						<h3>Moderação &amp; Copiloto Editorial</h3>
+						<p>Moderação automática de comentários com detecção de spam, sugestão de respostas em 1 clique, resumo em massa de posts e rascunhos periódicos.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">12</span>
-						<h3>Exportação de respostas</h3>
-						<p>Respostas podem ser copiadas ou baixadas em RTF para edição em Word, LibreOffice ou Docs.</p>
+						<h3>LGPD / GDPR Nativo no WordPress</h3>
+						<p>Exportador e eliminador de dados pessoais integrados às Ferramentas de Privacidade do WP, além de barra de consentimento por agente.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">13</span>
-						<h3>Propostas de email</h3>
-						<p>O agente prepara emails estruturados, mas o envio real depende de confirmação do usuário.</p>
+						<h3>Modo Claro/Escuro &amp; Uploads</h3>
+						<p>Alternância de tema por agente, design responsivo e upload público opcional de arquivos (TXT, MD, CSV, JSON, PDF, DOCX) direto na conversa.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">14</span>
-						<h3>Ações administrativas</h3>
-						<p>Integra WordPress Abilities API para propostas de ação com permissão e confirmação humana.</p>
+						<h3>E-mails &amp; Ações Confirmadas</h3>
+						<p>O agente prepara propostas de e-mail ou ações via WordPress Abilities API, mas a execução real exige confirmação humana explícita.</p>
 					</article>
 					<article class="feature">
 						<span class="feature-icon">15</span>
-						<h3>Tarefas periódicas</h3>
-						<p>Use WP-Cron para rascunhos, relatórios de comentários e revisões conservadoras do site.</p>
+						<h3>Relatórios &amp; Travas de Orçamento</h3>
+						<p>Acompanhe consumo de tokens por usuário/agente e defina limites diários, semanais e mensais, além de exportação de respostas em RTF.</p>
 					</article>
 				</div>
 			</section>
@@ -787,39 +903,39 @@
 				<div class="section-heading">
 					<span class="eyebrow">Como funciona</span>
 					<h2>Do ZIP ao agente publicado em poucos passos.</h2>
-					<p>O fluxo foi pensado para administradores WordPress: instalar, configurar provedor, criar agente, adicionar conhecimento e publicar o shortcode.</p>
+					<p>O fluxo foi desenhado para administradores WordPress: instalar, conectar provedor (WP AI, OpenRouter ou Plano Compatível), escolher um template, treinar com Auto-RAG e publicar.</p>
 				</div>
 
 				<div class="workflow">
 					<article class="step">
 						<span class="step-number">01</span>
 						<h3>Instale</h3>
-						<p>Baixe o ZIP da versão mais recente e envie pelo painel de plugins do WordPress.</p>
+						<p>Baixe o pacote <code>37agents-0.8.0.zip</code> e envie pelo painel de plugins do WordPress.</p>
 					</article>
 					<article class="step">
 						<span class="step-number">02</span>
 						<h3>Conecte IA</h3>
-						<p>Use WordPress AI / Connectors ou configure OpenRouter direto como fallback.</p>
+						<p>Escolha WordPress AI Connectors, OpenRouter ou planos como Xiaomi MiMo, Qwen, GLM, Kimi e DeepSeek.</p>
 					</article>
 					<article class="step">
 						<span class="step-number">03</span>
-						<h3>Crie um agente</h3>
-						<p>Defina nome, slug, prompt, modelo, contexto, acesso de visitantes e limites.</p>
+						<h3>Use um Template</h3>
+						<p>Inicie com 1 clique em Atendimento, STEPS, EAD ou personalize prompt, layout, tema e papéis.</p>
 					</article>
 					<article class="step">
 						<span class="step-number">04</span>
-						<h3>Treine</h3>
-						<p>Envie documentos, cole texto limpo e ajuste quantos trechos entram no prompt.</p>
+						<h3>Treine (Auto-RAG)</h3>
+						<p>Ative o Auto-RAG para posts/produtos WooCommerce e faça upload de manuais PDF e DOCX.</p>
 					</article>
 					<article class="step">
 						<span class="step-number">05</span>
 						<h3>Publique</h3>
-						<p>Cole o shortcode em qualquer página, post ou área do site.</p>
+						<p>Insira o bloco Gutenberg <code>37agents/agent-widget</code> ou o shortcode <code>[37agents_chat]</code>.</p>
 					</article>
 					<article class="step">
 						<span class="step-number">06</span>
-						<h3>Acompanhe</h3>
-						<p>Revise conversas, tokens, limites, emails e tarefas periódicas no admin.</p>
+						<h3>Monitore</h3>
+						<p>Acompanhe tokens, leads, webhooks, moderação de comentários e limites no painel administrativo.</p>
 					</article>
 				</div>
 			</section>
@@ -827,24 +943,26 @@
 			<section class="section" id="integracoes">
 				<div class="section-heading">
 					<span class="eyebrow">Provedores e conhecimento</span>
-					<h2>Flexível para projetos diferentes, sem prender o site a um único fornecedor.</h2>
+					<h2>Flexível para qualquer orçamento e modelo, sem prender o site a um único fornecedor.</h2>
 				</div>
 				<div class="integrations">
 					<div>
-						<h3>Camada recomendada: WordPress AI / Connectors</h3>
-						<p>Configure OpenAI, Gemini, Claude, OpenRouter ou outros conectores no plugin oficial de IA do WordPress. O WPAgent usa essa camada quando disponível e mantém OpenRouter direto como opção avançada.</p>
+						<h3>WordPress AI, OpenRouter &amp; Assinaturas Compatíveis</h3>
+						<p>O 37agents suporta nativamente o <strong>WordPress AI Client / Connectors</strong>, chaves diretas do <strong>OpenRouter</strong> (para fallback ou acesso a centenas de modelos) e assinaturas/APIs OpenAI-compatíveis com auto-descoberta de cluster e armazenamento criptografado (<code>AES-256-CBC</code>).</p>
 					</div>
 					<div class="integration-list" aria-label="Integrações suportadas">
-						<span>WordPress AI</span>
+						<span>WordPress AI / Connectors</span>
 						<span>OpenRouter</span>
-						<span>OpenAI</span>
-						<span>Claude</span>
-						<span>Gemini</span>
-						<span>Modelos por agente</span>
-						<span>Fallback configurável</span>
-						<span>Embeddings</span>
-						<span>WP-Cron</span>
-						<span>Shortcodes</span>
+						<span>Xiaomi MiMo Token Plan</span>
+						<span>Alibaba Qwen / Bailian</span>
+						<span>Zhipu GLM / Z.ai</span>
+						<span>Moonshot Kimi Code</span>
+						<span>MiniMax M Plan</span>
+						<span>Volcengine Ark</span>
+						<span>DeepSeek</span>
+						<span>SiliconFlow</span>
+						<span>WooCommerce Auto-RAG</span>
+						<span>Gutenberg Block</span>
 					</div>
 				</div>
 			</section>
@@ -856,48 +974,115 @@
 				</div>
 				<div class="use-grid">
 					<article class="use-card">
-						<h3><a href="https://educadoria.org">Educadoria</a></h3>
-						<p>Agentes para planejamento de aulas, BNCC, atividades, tutoria, acompanhamento pedagógico e atendimento de professores.</p>
-						<a class="project-link" href="https://educadoria.org">Saiba mais</a>
+						<div>
+							<h3><a href="https://educadoria.org" target="_blank" rel="noopener noreferrer">Educadoria</a></h3>
+							<p>Agentes para planejamento de aulas, BNCC, atividades, tutoria, acompanhamento pedagógico e atendimento de professores.</p>
+						</div>
+						<a class="project-link" href="https://educadoria.org" target="_blank" rel="noopener noreferrer">Saiba mais</a>
 					</article>
 					<article class="use-card">
-						<h3><a href="https://homilyai.com/br">HomilyAI</a></h3>
-						<p>Assistentes treinados com textos, estudos, liturgia, homilias, aconselhamento e materiais de formação.</p>
-						<a class="project-link" href="https://homilyai.com/br">Saiba mais</a>
+						<div>
+							<h3><a href="https://homilyai.com/br" target="_blank" rel="noopener noreferrer">HomilyAI</a></h3>
+							<p>Assistentes treinados com textos, estudos, liturgia, homilias, aconselhamento e materiais de formação.</p>
+						</div>
+						<a class="project-link" href="https://homilyai.com/br" target="_blank" rel="noopener noreferrer">Saiba mais</a>
 					</article>
+					<article class="use-card">
+						<div>
+							<h3><a href="https://jungagent.org" target="_blank" rel="noopener noreferrer">JungAgent</a></h3>
+							<p>Projeto de IA agêntica para emulação de psiquê profunda, análise de arquétipos e assistência a profissionais.</p>
+						</div>
+						<a class="project-link" href="https://jungagent.org" target="_blank" rel="noopener noreferrer">Saiba mais</a>
+					</article>
+				</div>
+			</section>
+
+			<section class="section" id="planos">
+				<div class="section-heading">
+					<span class="eyebrow">Ofertas e modelo BYOK</span>
+					<h2>Escolha entre autonomia total gratuita ou implementação VIP feita por nossa equipe.</h2>
+				</div>
+
+				<div class="plans-grid" id="vip-setup">
+					<article class="plan-card">
+						<div>
+							<span class="plan-tag">AUTONOMIA TOTAL</span>
+							<h3>Plugin Gratuito (BYOK)</h3>
+							<p style="color: var(--muted); font-size: 14px; margin: 10px 0 0;">Ideal para desenvolvedores, agências tech e quem prefere fazer o próprio setup técnico.</p>
+							<div class="plan-price">R$ 0 <small>/ para sempre</small></div>
+							<ul class="plan-list">
+								<li>✓ Plugin 37agents v0.8.0 100% liberado</li>
+								<li>✓ Código aberto GPL-2.0 &amp; múltiplos agentes</li>
+								<li>✓ Sua própria chave (OpenRouter, WP AI ou Planos IA)</li>
+								<li>✓ Layouts Chat SSE, STEPS &amp; EAD (LMS)</li>
+								<li>✓ Suporte via comunidade &amp; documentação</li>
+							</ul>
+						</div>
+						<a class="button button-secondary" href="https://github.com/lucasartel/37agents" target="_blank" rel="noopener noreferrer">Baixar no GitHub (v0.8.0)</a>
+					</article>
+
+					<article class="plan-card plan-card--featured">
+						<span class="plan-ribbon">RECOMENDADO PARA EMPRESAS</span>
+						<div>
+							<span class="plan-tag">DONE-FOR-YOU</span>
+							<h3>Plano Anual VIP</h3>
+							<p style="color: var(--muted); font-size: 14px; margin: 10px 0 0;">Instalação profissional, engenharia de prompt, treinamento de dados e suporte VIP contínuo.</p>
+							<div class="plan-price">R$ 490 <small>a R$ 990 / ano</small></div>
+							<div class="plan-note">Em até 12x no cartão de crédito</div>
+							<ul class="plan-list">
+								<li>✓ <strong>Tudo da versão gratuita +</strong></li>
+								<li>✓ Instalação &amp; ajuste técnico no WP (Cron/DB/LGPD)</li>
+								<li>✓ Engenharia de prompt &amp; criação da persona</li>
+								<li>✓ Indexação de documentos &amp; Auto-RAG (PDF/Woo)</li>
+								<li>✓ Auxílio na abertura de conta na API (transparente)</li>
+								<li>✓ <strong>12 meses de Suporte VIP (WhatsApp / E-mail)</strong></li>
+							</ul>
+						</div>
+						<a class="button button-primary" href="https://wa.me/5500000000000?text=Quero%20contratar%20o%20Plano%20VIP%20do%2037agents" target="_blank" rel="noopener noreferrer">Contratar Setup &amp; Suporte VIP</a>
+					</article>
+				</div>
+
+				<div class="transparency-box">
+					<h3>Transparência Total sobre Custos de API</h3>
+					<p>Você mantém 100% do controle do seu dinheiro. Nós <strong>não cobramos margem ou taxa intermediária</strong> sobre o uso da IA: ajudamos você a abrir sua própria conta (OpenRouter, Xiaomi MiMo Token Plan, Qwen, DeepSeek ou OpenAI), onde R$ 15 a R$ 30 por mês em créditos costumam atender milhares de interações.</p>
+					<div class="transparency-badges">
+						<span>✓ Sem intermediários no pagamento</span>
+						<span>✓ Conta no seu cartão de crédito</span>
+						<span>✓ Travas de limite por dia/semana/mês</span>
+					</div>
 				</div>
 			</section>
 
 			<section class="section" id="seguranca">
 				<div class="section-heading">
-					<span class="eyebrow">Segurança e controle</span>
-					<h2>IA com permissão explícita, limites e confirmação humana.</h2>
-					<p>O plugin foi desenhado para deixar claro quando o agente apenas conversa, quando propõe algo e quando uma ação real depende de confirmação.</p>
+					<span class="eyebrow">Segurança, privacidade e conformidade</span>
+					<h2>IA com chaves criptografadas, LGPD nativa e confirmação humana.</h2>
+					<p>Projetado seguindo as diretrizes de segurança do WordPress.org, protegendo credenciais, dados pessoais e ações administrativas.</p>
 				</div>
 				<div class="safety-grid">
 					<article class="safety-card">
-						<h3>Permissões WordPress</h3>
-						<p>Configuração de agentes e assistente admin exigem `manage_options`.</p>
+						<h3>Chaves Criptografadas (AES-256-CBC)</h3>
+						<p>Chaves OpenRouter e Planos Compatíveis são armazenadas criptografadas em repouso, com suporte opcional a constantes no <code>wp-config.php</code>.</p>
 					</article>
 					<article class="safety-card">
-						<h3>Visitantes sob controle</h3>
-						<p>Chat anônimo precisa ser habilitado por agente e recebe rate limit.</p>
+						<h3>Ferramentas Nativas LGPD / GDPR</h3>
+						<p>Exportadores e eliminadores de dados pessoais integrados ao WordPress (<code>WPAgent_Privacy</code>) e barra de consentimento configurável por agente.</p>
 					</article>
 					<article class="safety-card">
-						<h3>Emails confirmados</h3>
-						<p>O agente prepara a proposta, mas o usuário precisa confirmar antes do `wp_mail()`.</p>
+						<h3>Controle por Papel (RBAC) &amp; Rate Limit</h3>
+						<p>Restrinja qualquer agente por função de usuário do WordPress e controle visitantes anônimos com rate limit por IP.</p>
 					</article>
 					<article class="safety-card">
-						<h3>Ações administrativas confirmadas</h3>
-						<p>A Abilities API passa por capability checks e confirmação no chat.</p>
+						<h3>Webhooks &amp; Endpoints Protegidos</h3>
+						<p>Validação estrita de URLs com <code>wp_safe_remote_post</code> contra SSRF, além de checagem de nonces e permissões em toda a API REST.</p>
 					</article>
 					<article class="safety-card">
-						<h3>Chaves protegidas</h3>
-						<p>OpenRouter API keys não são exibidas de volta na tela de configuração.</p>
+						<h3>E-mails &amp; Ações sob Confirmação</h3>
+						<p>Propostas de e-mail e ações da WordPress Abilities API exigem aprovação explícita antes de serem executadas.</p>
 					</article>
 					<article class="safety-card">
-						<h3>Privacidade consciente</h3>
-						<p>Conversas, memórias, perfis e eventos de email devem ser declarados na política de privacidade do site.</p>
+						<h3>Sanitização Anti-XSS no Front-end</h3>
+						<p>Renderização de Markdown protegida contra XSS em Chat, STEPS e EAD, além de validação rigorosa de MIME/extensão em uploads.</p>
 					</article>
 				</div>
 			</section>
@@ -905,32 +1090,32 @@
 			<section class="section" id="download-final">
 				<div class="section-heading">
 					<span class="eyebrow">Download</span>
-					<h2>Comece pela última versão publicada no GitHub.</h2>
+					<h2>Comece pela versão 0.8.0 publicada no GitHub.</h2>
 				</div>
 				<div class="download-band">
 					<div>
-						<h3>WPAgent v0.4.15</h3>
-						<p>Correção de caracteres acentuados (mojibake) na interface em português e espanhol, tema padrão claro/escuro por agente e tratamento de erros de timeout do chat com mensagens localizadas.</p>
+						<h3>37agents v0.8.0</h3>
+						<p>Rebrand completo para 37agents com novo logotipo, bloco Gutenberg <code>37agents/agent-widget</code>, Starter Templates, Auto-RAG, Streaming SSE, planos compatíveis (Xiaomi MiMo, Qwen, GLM, Kimi, DeepSeek), LGPD/GDPR, Lead Capture e Webhooks.</p>
 					</div>
 					<div class="cta-actions">
-						<a class="button button-primary" href="https://github.com/lucasartel/wpagent/releases/latest/download/wpagent-0.4.15.zip">Baixar ZIP</a>
-						<a class="button button-secondary" href="https://github.com/lucasartel/wpagent/releases">Todas as versões</a>
+						<a class="button button-primary" href="https://github.com/lucasartel/37agents">Ver / Baixar v0.8.0</a>
+						<a class="button button-secondary" href="https://github.com/lucasartel/37agents/releases">Todas as versões</a>
 					</div>
 				</div>
 			</section>
 
 			<section class="cta">
-				<h2>Gratuito, aberto e pronto para evoluir com a comunidade.</h2>
-				<p>Use o WPAgent como base para criar agentes especializados em educação, conteúdo, atendimento, pastoral, documentação interna e operação WordPress.</p>
+				<h2>Gratuito, aberto e pronto para escalar o seu WordPress com IA.</h2>
+				<p>Use o 37agents com total autonomia no modelo BYOK ou conte com a equipe 37graus para implementar o Setup VIP e treinar seus agentes sob medida.</p>
 				<div class="cta-actions">
-					<a class="button button-primary" href="https://github.com/lucasartel/wpagent">Abrir no GitHub</a>
-					<a class="button button-secondary" href="https://github.com/lucasartel/wpagent/issues">Reportar issue</a>
+					<a class="button button-primary" href="https://github.com/lucasartel/37agents" target="_blank" rel="noopener noreferrer">Abrir no GitHub</a>
+					<a class="button button-secondary" href="https://github.com/lucasartel/37agents/issues" target="_blank" rel="noopener noreferrer">Reportar issue</a>
 				</div>
 			</section>
 		</main>
 
 		<footer class="footer">
-			WPAgent - plugin gratuito para agentes de IA no WordPress. <a href="https://github.com/lucasartel/wpagent">GitHub</a> | <a href="https://github.com/lucasartel/wpagent/releases/latest">Última versão</a>
+			37agents (por 37graus) — plugin gratuito para agentes de IA no WordPress. <a href="https://github.com/lucasartel/37agents">GitHub</a> | <a href="https://github.com/lucasartel/37agents/releases">Versões</a> | <a href="https://37graus.com.br">37graus.com.br</a>
 		</footer>
 	</div>
 </body>
