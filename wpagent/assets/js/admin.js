@@ -456,6 +456,69 @@
 			'wpagent-agent-compatible-key-hint',
 			true
 		);
+
+		var testBtn = document.getElementById('wpagent-test-compatible-api');
+		if (testBtn) {
+			testBtn.addEventListener('click', function () {
+				var resultEl = document.getElementById('wpagent-test-compatible-result');
+				var presetEl = document.getElementById('wpagent-compatible-preset');
+				var baseUrlEl = document.getElementById('wpagent-compatible-base-url');
+				var apiKeyEl = document.getElementById('wpagent-compatible-api-key');
+				var modelEl = document.getElementById('wpagent-compatible-model');
+
+				testBtn.disabled = true;
+				if (resultEl) {
+					resultEl.style.color = '#1e293b';
+					resultEl.textContent = 'Testando conexão...';
+				}
+
+				$.post(window.ajaxurl, {
+					action: 'wpagent_test_compatible_api',
+					nonce: testBtn.getAttribute('data-nonce') || '',
+					preset: presetEl ? presetEl.value : '',
+					base_url: baseUrlEl ? baseUrlEl.value : '',
+					api_key: apiKeyEl ? apiKeyEl.value : '',
+					model: modelEl ? modelEl.value : ''
+				})
+					.done(function (res) {
+						if (res && res.success) {
+							if (baseUrlEl && res.data && res.data.base_url) {
+								baseUrlEl.value = res.data.base_url;
+							}
+							if (modelEl && res.data && res.data.model) {
+								modelEl.value = res.data.model;
+							}
+							if (apiKeyEl && apiKeyEl.value.trim() !== '') {
+								apiKeyEl.value = '';
+								apiKeyEl.setAttribute('placeholder', 'Chave salva. Preencha apenas para trocar.');
+							}
+							if (resultEl) {
+								resultEl.style.color = '#047857';
+								resultEl.textContent = (res.data && res.data.message) ? res.data.message : 'Conexão validada com sucesso!';
+							}
+						} else {
+							var errMsg = (res && res.data && res.data.message) ? res.data.message : 'Falha ao validar a conexão.';
+							if (resultEl) {
+								resultEl.style.color = '#dc2626';
+								resultEl.textContent = errMsg;
+							}
+						}
+					})
+					.fail(function (xhr) {
+						var msg = 'Erro de comunicação ao testar a conexão.';
+						if (xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+							msg = xhr.responseJSON.data.message;
+						}
+						if (resultEl) {
+							resultEl.style.color = '#dc2626';
+							resultEl.textContent = msg;
+						}
+					})
+					.always(function () {
+						testBtn.disabled = false;
+					});
+			});
+		}
 	}
 
 	document.addEventListener('DOMContentLoaded', function () {

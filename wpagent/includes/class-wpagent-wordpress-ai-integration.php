@@ -22,7 +22,7 @@ class WPAgent_WordPress_AI_Integration {
 	public function sync_openrouter_key_to_connectors() {
 		$key = $this->settings->get( 'openrouter_api_key', '' );
 
-		if ( empty( $key ) || '1' !== $this->settings->get( 'use_wp_ai_client', '1' ) || ! function_exists( 'wp_get_connectors' ) ) {
+		if ( empty( $key ) || 0 !== strpos( $key, 'sk-or-' ) || '1' !== $this->settings->get( 'use_wp_ai_client', '1' ) || ! function_exists( 'wp_get_connectors' ) ) {
 			return;
 		}
 
@@ -42,7 +42,7 @@ class WPAgent_WordPress_AI_Integration {
 		$key   = $this->settings->get( 'openrouter_api_key', '' );
 		$model = $this->settings->get( 'openrouter_model', '' );
 
-		if ( empty( $key ) || empty( $model ) || '1' !== $this->settings->get( 'use_wp_ai_client', '1' ) ) {
+		if ( empty( $key ) || 0 !== strpos( $key, 'sk-or-' ) || empty( $model ) || '1' !== $this->settings->get( 'use_wp_ai_client', '1' ) ) {
 			return $models;
 		}
 
@@ -55,7 +55,8 @@ class WPAgent_WordPress_AI_Integration {
 	}
 
 	public function report_wpagent_openrouter_credentials( $has_credentials, $connectors ) {
-		if ( $has_credentials || empty( $this->settings->get( 'openrouter_api_key', '' ) ) || '1' !== $this->settings->get( 'use_wp_ai_client', '1' ) ) {
+		$key = $this->settings->get( 'openrouter_api_key', '' );
+		if ( $has_credentials || empty( $key ) || 0 !== strpos( $key, 'sk-or-' ) || '1' !== $this->settings->get( 'use_wp_ai_client', '1' ) ) {
 			return $has_credentials;
 		}
 

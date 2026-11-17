@@ -8,21 +8,48 @@ if ( ! class_exists( 'WPAgent_Settings' ) ) {
 class WPAgent_Settings {
 	const OPTION_NAME = 'wpagent_settings';
 
+	public static function clean_api_key( $raw ) {
+		$raw = (string) $raw;
+		if ( 0 === strpos( $raw, 'enc:v1:' ) ) {
+			return trim( $raw );
+		}
+
+		$cleaned = preg_replace( '/[\x00-\x1F\x7F]/', '', $raw );
+		$cleaned = trim( (string) $cleaned, " \t\n\r\0\x0B\"'" );
+		$cleaned = preg_replace( '/^Bearer\s+/i', '', $cleaned );
+
+		return trim( (string) $cleaned, " \t\n\r\0\x0B\"'" );
+	}
+
 	public static function get_compatible_provider_presets() {
 		return array(
 			'xiaomi_token_plan' => array(
-				'label'         => 'Xiaomi MiMo — Token Plan (Assinatura tp-... / ttp-...)',
+				'label'         => 'Xiaomi MiMo — Token Plan (Auto / China token-plan-cn)',
 				'base_url'      => 'https://token-plan-cn.xiaomimimo.com/v1',
 				'default_model' => 'mimo-v2.6-pro',
-				'models'        => array( 'mimo-v2.6-pro', 'mimo-v2.6-flash' ),
-				'key_hint'      => __( 'Chave do plano iniciada por tp-... (individual) ou ttp-... (equipe) em platform.xiaomimimo.com', 'wpagent' ),
+				'models'        => array( 'mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2-flash' ),
+				'key_hint'      => __( 'Chave do Token Plan iniciada por tp-... ou ttp-... (o 37agents detecta automaticamente os clusters China, Singapura SGP e Europa AMS).', 'wpagent' ),
+			),
+			'xiaomi_token_plan_sgp' => array(
+				'label'         => 'Xiaomi MiMo — Token Plan Global / Singapura (token-plan-sgp)',
+				'base_url'      => 'https://token-plan-sgp.xiaomimimo.com/v1',
+				'default_model' => 'mimo-v2.6-pro',
+				'models'        => array( 'mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2-flash' ),
+				'key_hint'      => __( 'Chave do Token Plan (tp-... / ttp-...) para o cluster Singapura / Global.', 'wpagent' ),
+			),
+			'xiaomi_token_plan_ams' => array(
+				'label'         => 'Xiaomi MiMo — Token Plan Europa / Amsterdam (token-plan-ams)',
+				'base_url'      => 'https://token-plan-ams.xiaomimimo.com/v1',
+				'default_model' => 'mimo-v2.6-pro',
+				'models'        => array( 'mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2-flash' ),
+				'key_hint'      => __( 'Chave do Token Plan (tp-... / ttp-...) para o cluster Europa / Amsterdam.', 'wpagent' ),
 			),
 			'xiaomi_mimo' => array(
-				'label'         => 'Xiaomi MiMo — API Padrão (sk-...)',
+				'label'         => 'Xiaomi MiMo — API Padrão (api.xiaomimimo.com / sk-...)',
 				'base_url'      => 'https://api.xiaomimimo.com/v1',
 				'default_model' => 'mimo-v2.6-pro',
-				'models'        => array( 'mimo-v2.6-pro', 'mimo-v2.6-flash' ),
-				'key_hint'      => __( 'Chave de API padrão (sk-...) gerada em platform.xiaomimimo.com', 'wpagent' ),
+				'models'        => array( 'mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2-flash' ),
+				'key_hint'      => __( 'Chave de API Pay-as-you-go (sk-... ou miMo-sk-...) gerada em platform.xiaomimimo.com.', 'wpagent' ),
 			),
 			'alibaba_coding' => array(
 				'label'         => 'Alibaba Cloud — Qwen / Bailian Coding Plan (Assinatura)',
@@ -143,6 +170,7 @@ class WPAgent_Settings {
 		add_action( 'admin_menu', array( $this, 'reorder_admin_menu' ), 999 );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_filter( 'parent_file', array( $this, 'fix_parent_menu_link' ), 999 );
+		add_action( 'wp_ajax_wpagent_test_compatible_api', array( $this, 'ajax_test_compatible_api' ) );
 	}
 
 	public function add_menu() {
@@ -276,15 +304,15 @@ class WPAgent_Settings {
 		$raw_stored_options = get_option( self::OPTION_NAME, array() );
 		$raw_stored_options = is_array( $raw_stored_options ) ? $raw_stored_options : array();
 
-		$submitted_key = isset( $input['openrouter_api_key'] ) ? trim( (string) $input['openrouter_api_key'] ) : '';
+		$submitted_key = isset( $input['openrouter_api_key'] ) ? self::clean_api_key( $input['openrouter_api_key'] ) : '';
 		$raw_key       = '' === $submitted_key
-			? sanitize_text_field( $raw_stored_options['openrouter_api_key'] ?? '' )
-			: sanitize_text_field( $submitted_key );
+			? self::clean_api_key( $raw_stored_options['openrouter_api_key'] ?? '' )
+			: $submitted_key;
 
-		$submitted_compat_key = isset( $input['compatible_api_key'] ) ? trim( (string) $input['compatible_api_key'] ) : '';
+		$submitted_compat_key = isset( $input['compatible_api_key'] ) ? self::clean_api_key( $input['compatible_api_key'] ) : '';
 		$raw_compat_key       = '' === $submitted_compat_key
-			? sanitize_text_field( $raw_stored_options['compatible_api_key'] ?? '' )
-			: sanitize_text_field( $submitted_compat_key );
+			? self::clean_api_key( $raw_stored_options['compatible_api_key'] ?? '' )
+			: $submitted_compat_key;
 
 		$allowed_modes = array( 'wordpress_ai', 'wpagent_compatible', 'wpagent_openrouter' );
 		if ( isset( $input['default_provider_mode'] ) && in_array( $input['default_provider_mode'], $allowed_modes, true ) ) {
@@ -415,19 +443,72 @@ class WPAgent_Settings {
 			$parsed['default_provider_mode'] = '1' === (string) ( $parsed['use_wp_ai_client'] ?? '1' ) ? 'wordpress_ai' : 'wpagent_openrouter';
 		}
 
-		if ( defined( 'WPAGENT_OPENROUTER_API_KEY' ) && '' !== trim( (string) WPAGENT_OPENROUTER_API_KEY ) ) {
-			$parsed['openrouter_api_key'] = trim( (string) WPAGENT_OPENROUTER_API_KEY );
+		if ( defined( 'WPAGENT_OPENROUTER_API_KEY' ) && '' !== self::clean_api_key( WPAGENT_OPENROUTER_API_KEY ) ) {
+			$parsed['openrouter_api_key'] = self::clean_api_key( WPAGENT_OPENROUTER_API_KEY );
 		} elseif ( ! empty( $parsed['openrouter_api_key'] ) ) {
-			$parsed['openrouter_api_key'] = $this->decrypt_secret( $parsed['openrouter_api_key'] );
+			$parsed['openrouter_api_key'] = self::clean_api_key( $this->decrypt_secret( $parsed['openrouter_api_key'] ) );
 		}
 
-		if ( defined( 'WPAGENT_COMPATIBLE_API_KEY' ) && '' !== trim( (string) WPAGENT_COMPATIBLE_API_KEY ) ) {
-			$parsed['compatible_api_key'] = trim( (string) WPAGENT_COMPATIBLE_API_KEY );
+		if ( defined( 'WPAGENT_COMPATIBLE_API_KEY' ) && '' !== self::clean_api_key( WPAGENT_COMPATIBLE_API_KEY ) ) {
+			$parsed['compatible_api_key'] = self::clean_api_key( WPAGENT_COMPATIBLE_API_KEY );
 		} elseif ( ! empty( $parsed['compatible_api_key'] ) ) {
-			$parsed['compatible_api_key'] = $this->decrypt_secret( $parsed['compatible_api_key'] );
+			$parsed['compatible_api_key'] = self::clean_api_key( $this->decrypt_secret( $parsed['compatible_api_key'] ) );
 		}
 
 		return $parsed;
+	}
+
+	public function ajax_test_compatible_api() {
+		check_ajax_referer( 'wpagent_test_compatible_api', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permissão negada.', 'wpagent' ) ), 403 );
+		}
+
+		$override = array(
+			'preset'   => isset( $_POST['preset'] ) ? sanitize_key( wp_unslash( $_POST['preset'] ) ) : '',
+			'base_url' => isset( $_POST['base_url'] ) ? esc_url_raw( trim( (string) wp_unslash( $_POST['base_url'] ) ) ) : '',
+			'api_key'  => isset( $_POST['api_key'] ) ? self::clean_api_key( wp_unslash( $_POST['api_key'] ) ) : '',
+			'model'    => isset( $_POST['model'] ) ? sanitize_text_field( wp_unslash( $_POST['model'] ) ) : '',
+		);
+
+		$repo      = new WPAgent_Repository();
+		$agents    = new WPAgent_Agents( $this, $repo );
+		$ai_client = new WPAgent_AI_Client( $repo, $this, $agents );
+		$result    = $ai_client->test_compatible_connection( $override );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+		}
+
+		$raw_options = get_option( self::OPTION_NAME, array() );
+		$raw_options = is_array( $raw_options ) ? $raw_options : array();
+		$needs_save  = false;
+
+		if ( '' !== $override['api_key'] ) {
+			$raw_options['compatible_api_key']    = $this->encrypt_secret( $override['api_key'] );
+			$raw_options['default_provider_mode'] = 'wpagent_compatible';
+			$raw_options['use_wp_ai_client']      = '0';
+			$needs_save                           = true;
+		}
+		if ( ! empty( $result['base_url'] ) && ( '' !== $override['api_key'] || ( $raw_options['compatible_api_base_url'] ?? '' ) !== $result['base_url'] ) ) {
+			$raw_options['compatible_api_base_url'] = esc_url_raw( $result['base_url'] );
+			$needs_save                             = true;
+		}
+		if ( '' !== $override['preset'] ) {
+			$raw_options['compatible_provider_preset'] = $override['preset'];
+			$needs_save                                = true;
+		}
+		if ( ! empty( $result['model'] ) && ( '' !== $override['api_key'] || ( $raw_options['compatible_model'] ?? '' ) !== $result['model'] ) ) {
+			$raw_options['compatible_model'] = sanitize_text_field( $result['model'] );
+			$needs_save                      = true;
+		}
+
+		if ( $needs_save ) {
+			update_option( self::OPTION_NAME, $raw_options );
+		}
+
+		wp_send_json_success( $result );
 	}
 
 	public function get( $key, $default = null ) {
@@ -495,82 +576,33 @@ class WPAgent_Settings {
 	}
 
 	private function render_general_settings( $options ) {
-		$embedding_status = get_option( 'wpagent_embedding_status', array() );
-		$embedding_status = is_array( $embedding_status ) ? $embedding_status : array();
+		$embedding_status   = get_option( 'wpagent_embedding_status', array() );
+		$embedding_status   = is_array( $embedding_status ) ? $embedding_status : array();
 		$next_embedding_run = wp_next_scheduled( WPAgent_Embeddings::CRON_HOOK );
-		$wp_ai_available = function_exists( 'WordPress\\AI\\get_ai_service' ) || function_exists( 'wp_ai_client_prompt' );
+		$wp_ai_available    = function_exists( 'WordPress\\AI\\get_ai_service' ) || function_exists( 'wp_ai_client_prompt' );
+		$compatible_presets = self::get_compatible_provider_presets();
+		$compatible_preset  = $options['compatible_provider_preset'] ?? 'xiaomi_token_plan';
+		if ( ! isset( $compatible_presets[ $compatible_preset ] ) ) {
+			$compatible_preset = 'xiaomi_token_plan';
+		}
+		$current_key_hint   = $compatible_presets[ $compatible_preset ]['key_hint'] ?? '';
+		$test_api_nonce     = wp_create_nonce( 'wpagent_test_compatible_api' );
 		?>
-				<h2><?php esc_html_e( 'WordPress AI / Connectors', 'wpagent' ); ?></h2>
-				<p>
-					<?php esc_html_e( 'O caminho recomendado e configurar OpenAI, Gemini, Claude, OpenRouter ou outros provedores no plugin AI oficial do WordPress em Settings > Connectors. O WPAgent usa essa configuracao para chats e tarefas de IA quando disponivel.', 'wpagent' ); ?>
-				</p>
-				<p>
-					<strong><?php esc_html_e( 'Status:', 'wpagent' ); ?></strong>
-					<?php if ( $wp_ai_available ) : ?>
-						<?php esc_html_e( 'WordPress AI Client detectado.', 'wpagent' ); ?>
-					<?php else : ?>
-						<?php esc_html_e( 'WordPress AI Client ainda nao foi detectado. Instale/ative o plugin AI oficial ou use o OpenRouter direto abaixo.', 'wpagent' ); ?>
-					<?php endif; ?>
-				</p>
+				<h2><?php esc_html_e( 'Provedor Padrão de IA', 'wpagent' ); ?></h2>
 				<table class="form-table" role="presentation">
 					<tr>
-						<th scope="row"><label for="wpagent-default-provider-mode"><?php esc_html_e( 'Provedor padrao', 'wpagent' ); ?></label></th>
+						<th scope="row"><label for="wpagent-default-provider-mode"><?php esc_html_e( 'Provedor padrão', 'wpagent' ); ?></label></th>
 						<td>
 							<select id="wpagent-default-provider-mode" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[default_provider_mode]">
 								<option value="wordpress_ai" <?php selected( $options['default_provider_mode'], 'wordpress_ai' ); ?>><?php esc_html_e( 'WordPress AI / Connectors (recomendado)', 'wpagent' ); ?></option>
 								<option value="wpagent_compatible" <?php selected( $options['default_provider_mode'], 'wpagent_compatible' ); ?>><?php esc_html_e( 'Plano de IA / API Compatível (Xiaomi MiMo, GLM, Qwen, Kimi, MiniMax, DeepSeek)', 'wpagent' ); ?></option>
 								<option value="wpagent_openrouter" <?php selected( $options['default_provider_mode'], 'wpagent_openrouter' ); ?>><?php esc_html_e( 'OpenRouter direto pelo 37agents', 'wpagent' ); ?></option>
 							</select>
-							<p class="description"><?php esc_html_e( 'Define qual provedor novos agentes herdam por padrão e qual modo assume prioridade quando houver fallback. Agentes existentes podem ser ajustados individualmente na tela do agente.', 'wpagent' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Modelo padrao do WordPress AI', 'wpagent' ); ?></th>
-						<td>
-							<p>
-								<label for="wpagent-wordpress-ai-provider"><?php esc_html_e( 'Provider', 'wpagent' ); ?></label><br>
-								<input id="wpagent-wordpress-ai-provider" class="regular-text" list="wpagent-provider-presets" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[wordpress_ai_provider]" value="<?php echo esc_attr( $options['wordpress_ai_provider'] ); ?>" placeholder="openai">
-							</p>
-							<p>
-								<label for="wpagent-wordpress-ai-model"><?php esc_html_e( 'Modelo', 'wpagent' ); ?></label><br>
-								<input id="wpagent-wordpress-ai-model" class="regular-text" list="wpagent-model-presets" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[wordpress_ai_model]" value="<?php echo esc_attr( $options['wordpress_ai_model'] ); ?>" placeholder="gpt-4.1-mini">
-							</p>
-							<?php $this->render_ai_model_datalists(); ?>
-							<p class="description"><?php esc_html_e( 'Opcional. Quando preenchido, o WPAgent envia este provider/model como preferencia para o WordPress AI Client. Deixe em branco para usar o modelo padrao escolhido pelo conector/plugin AI.', 'wpagent' ); ?></p>
-							<p class="description"><?php esc_html_e( 'A listagem automatica de modelos depende de cada conector expor essa informacao. Por enquanto, use o ID oficial do modelo informado pelo fornecedor.', 'wpagent' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="wpagent-model"><?php esc_html_e( 'Modelo OpenRouter direto', 'wpagent' ); ?></label></th>
-						<td>
-							<input id="wpagent-model" class="regular-text" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[openrouter_model]" value="<?php echo esc_attr( $options['openrouter_model'] ); ?>">
-							<p class="description"><?php esc_html_e( 'Valor usado apenas pelo modo OpenRouter direto do WPAgent ou como fallback quando o WordPress AI falhar e houver uma chave OpenRouter salva.', 'wpagent' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="wpagent-api-key"><?php esc_html_e( 'OpenRouter API key opcional', 'wpagent' ); ?></label></th>
-						<td>
-							<input id="wpagent-api-key" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[openrouter_api_key]" value="" placeholder="<?php echo empty( $options['openrouter_api_key'] ) ? '' : esc_attr__( 'Chave salva. Preencha apenas para trocar.', 'wpagent' ); ?>">
-							<p class="description"><?php esc_html_e( 'Preencha somente se quiser usar OpenRouter direto pelo WPAgent ou manter um fallback proprio. Se houver um conector OpenRouter no WordPress AI, o WPAgent tambem tenta espelhar esta chave para ele.', 'wpagent' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="wpagent-ai-timeout"><?php esc_html_e( 'Timeout das requisições à IA (segundos)', 'wpagent' ); ?></label></th>
-						<td>
-							<input id="wpagent-ai-timeout" type="number" min="5" max="300" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[ai_request_timeout]" value="<?php echo absint( $options['ai_request_timeout'] ?? 30 ); ?>" class="small-text">
-							<p class="description"><?php esc_html_e( 'Tempo máximo de espera por resposta da IA. Aumente se usar modelos mais lentos. Padrão: 30 segundos.', 'wpagent' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Define qual provedor os agentes herdam por padrão e qual modo assume prioridade. Agentes existentes podem ser ajustados na tela do agente.', 'wpagent' ); ?></p>
 						</td>
 					</tr>
 				</table>
 
-				<?php
-				$compatible_presets = self::get_compatible_provider_presets();
-				$compatible_preset  = $options['compatible_provider_preset'] ?? 'xiaomi_token_plan';
-				if ( ! isset( $compatible_presets[ $compatible_preset ] ) ) {
-					$compatible_preset = 'xiaomi_token_plan';
-				}
-				$current_key_hint = $compatible_presets[ $compatible_preset ]['key_hint'] ?? '';
-				?>
 				<h2><?php esc_html_e( 'Planos de IA & APIs Compatíveis (Xiaomi MiMo, GLM, Qwen, Kimi, MiniMax, DeepSeek, OpenCode)', 'wpagent' ); ?></h2>
 				<p class="description"><?php esc_html_e( 'Conecte assinaturas de Coding/Token Plan (como Xiaomi MiMo Token Plan, Alibaba Qwen Coding Plan, Zhipu GLM Coding Plan, Moonshot Kimi Code, MiniMax M Plan e Volcengine Ark) ou qualquer API compatível com o protocolo OpenAI / OpenCode.', 'wpagent' ); ?></p>
 				<table class="form-table" role="presentation">
@@ -589,13 +621,16 @@ class WPAgent_Settings {
 						<th scope="row"><label for="wpagent-compatible-base-url"><?php esc_html_e( 'Base URL (Endpoint)', 'wpagent' ); ?></label></th>
 						<td>
 							<input id="wpagent-compatible-base-url" class="regular-text code" type="url" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[compatible_api_base_url]" value="<?php echo esc_attr( $options['compatible_api_base_url'] ); ?>" placeholder="https://token-plan-cn.xiaomimimo.com/v1">
-							<p class="description"><?php esc_html_e( 'Preenchida automaticamente ao selecionar o plano acima. Se o seu painel fornecer uma URL exclusiva, basta colar aqui.', 'wpagent' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Preenchida automaticamente ao selecionar o plano acima. Para Xiaomi Token Plan, os clusters regionais (CN, SGP, AMS) também são testados automaticamente.', 'wpagent' ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="wpagent-compatible-api-key"><?php esc_html_e( 'API Key do Plano / Provedor', 'wpagent' ); ?></label></th>
 						<td>
 							<input id="wpagent-compatible-api-key" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[compatible_api_key]" value="" placeholder="<?php echo empty( $options['compatible_api_key'] ) ? '' : esc_attr__( 'Chave salva. Preencha apenas para trocar.', 'wpagent' ); ?>">
+							<?php if ( ! empty( $options['compatible_api_key'] ) ) : ?>
+								<span style="margin-left:8px;color:#047857;font-weight:600;">✅ <?php esc_html_e( 'Chave salva no banco', 'wpagent' ); ?></span>
+							<?php endif; ?>
 							<p class="description"><?php esc_html_e( 'Armazenada criptografada no banco de dados (ou via constante WPAGENT_COMPATIBLE_API_KEY no wp-config.php).', 'wpagent' ); ?></p>
 						</td>
 					</tr>
@@ -604,11 +639,74 @@ class WPAgent_Settings {
 						<td>
 							<input id="wpagent-compatible-model" class="regular-text" list="wpagent-compatible-model-presets" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[compatible_model]" value="<?php echo esc_attr( $options['compatible_model'] ); ?>" placeholder="mimo-v2.6-pro">
 							<?php self::render_compatible_model_datalist( $compatible_preset ); ?>
-							<p class="description"><?php esc_html_e( 'Ex.: mimo-v2.6-pro, qwen3.5-plus, glm-5.3, kimi-k2.7-code, MiniMax-M3, deepseek-chat.', 'wpagent' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Ex.: mimo-v2.6-pro, mimo-v2.6-flash, qwen3.5-plus, glm-5.3, kimi-k2.7-code, MiniMax-M3, deepseek-chat.', 'wpagent' ); ?></p>
+							<p style="margin-top:10px;">
+								<button type="button" class="button button-secondary" id="wpagent-test-compatible-api" data-nonce="<?php echo esc_attr( $test_api_nonce ); ?>">🔌 <?php esc_html_e( 'Testar Conexão da API', 'wpagent' ); ?></button>
+								<span id="wpagent-test-compatible-result" style="margin-left:10px;font-weight:600;"></span>
+							</p>
 						</td>
 					</tr>
 				</table>
 
+				<h2><?php esc_html_e( 'OpenRouter Direto', 'wpagent' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="wpagent-model"><?php esc_html_e( 'Modelo OpenRouter direto', 'wpagent' ); ?></label></th>
+						<td>
+							<input id="wpagent-model" class="regular-text" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[openrouter_model]" value="<?php echo esc_attr( $options['openrouter_model'] ); ?>">
+							<p class="description"><?php esc_html_e( 'Valor usado apenas pelo modo OpenRouter direto do 37agents ou como fallback quando o provedor principal falhar e houver uma chave OpenRouter salva.', 'wpagent' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="wpagent-api-key"><?php esc_html_e( 'OpenRouter API key opcional', 'wpagent' ); ?></label></th>
+						<td>
+							<input id="wpagent-api-key" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[openrouter_api_key]" value="" placeholder="<?php echo empty( $options['openrouter_api_key'] ) ? '' : esc_attr__( 'Chave salva. Preencha apenas para trocar.', 'wpagent' ); ?>">
+							<?php if ( ! empty( $options['openrouter_api_key'] ) ) : ?>
+								<span style="margin-left:8px;color:#047857;font-weight:600;">✅ <?php esc_html_e( 'Chave salva no banco', 'wpagent' ); ?></span>
+							<?php endif; ?>
+							<p class="description"><?php esc_html_e( 'Use apenas para chaves da OpenRouter (sk-or-...). Chaves da Xiaomi MiMo / planos compatíveis devem ser inseridas na seção acima.', 'wpagent' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="wpagent-ai-timeout"><?php esc_html_e( 'Timeout das requisições à IA (segundos)', 'wpagent' ); ?></label></th>
+						<td>
+							<input id="wpagent-ai-timeout" type="number" min="5" max="300" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[ai_request_timeout]" value="<?php echo absint( $options['ai_request_timeout'] ?? 30 ); ?>" class="small-text">
+							<p class="description"><?php esc_html_e( 'Tempo máximo de espera por resposta da IA. Aumente se usar modelos mais lentos. Padrão: 30 segundos.', 'wpagent' ); ?></p>
+						</td>
+					</tr>
+				</table>
+
+				<h2><?php esc_html_e( 'WordPress AI / Connectors', 'wpagent' ); ?></h2>
+				<p>
+					<?php esc_html_e( 'Opcionalmente configure OpenAI, Gemini, Claude, OpenRouter ou outros provedores no plugin AI oficial do WordPress em Settings > Connectors.', 'wpagent' ); ?>
+				</p>
+				<p>
+					<strong><?php esc_html_e( 'Status:', 'wpagent' ); ?></strong>
+					<?php if ( $wp_ai_available ) : ?>
+						<?php esc_html_e( 'WordPress AI Client detectado.', 'wpagent' ); ?>
+					<?php else : ?>
+						<?php esc_html_e( 'WordPress AI Client ainda nao foi detectado. Instale/ative o plugin AI oficial ou use os Planos Compatíveis / OpenRouter acima.', 'wpagent' ); ?>
+					<?php endif; ?>
+				</p>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Modelo padrao do WordPress AI', 'wpagent' ); ?></th>
+						<td>
+							<p>
+								<label for="wpagent-wordpress-ai-provider"><?php esc_html_e( 'Provider', 'wpagent' ); ?></label><br>
+								<input id="wpagent-wordpress-ai-provider" class="regular-text" list="wpagent-provider-presets" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[wordpress_ai_provider]" value="<?php echo esc_attr( $options['wordpress_ai_provider'] ); ?>" placeholder="openai">
+							</p>
+							<p>
+								<label for="wpagent-wordpress-ai-model"><?php esc_html_e( 'Modelo', 'wpagent' ); ?></label><br>
+								<input id="wpagent-wordpress-ai-model" class="regular-text" list="wpagent-model-presets" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[wordpress_ai_model]" value="<?php echo esc_attr( $options['wordpress_ai_model'] ); ?>" placeholder="gpt-4.1-mini">
+							</p>
+							<?php $this->render_ai_model_datalists(); ?>
+							<p class="description"><?php esc_html_e( 'Opcional. Quando preenchido, o 37agents envia este provider/model como preferencia para o WordPress AI Client.', 'wpagent' ); ?></p>
+						</td>
+					</tr>
+				</table>
+
+				<h2><?php esc_html_e( 'Comportamento Geral, RAG & Limites', 'wpagent' ); ?></h2>
 				<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Padrao: visitantes anonimos', 'wpagent' ); ?></th>
