@@ -41,8 +41,8 @@ class WPAgent_Dashboard {
 		$dismiss_url  = wp_nonce_url( admin_url( 'admin-ajax.php?action=wpagent_dismiss_no_provider' ), 'wpagent_dismiss_no_provider' );
 		echo '<div class="notice notice-warning is-dismissible" id="wpagent-no-provider-notice"><p>';
 		printf(
-			/* translators: 1: settings URL */
 			wp_kses(
+				/* translators: %1$s: settings URL. */
 				__( '<strong>37agents:</strong> Nenhum provedor de IA configurado. Configure um Plano de IA Compatível (Xiaomi MiMo, Qwen, GLM, Kimi), chave OpenRouter ou ative o WordPress AI Client em <a href="%1$s">Configurações</a>.', 'wpagent' ),
 				array( 'strong' => array(), 'a' => array( 'href' => array() ) )
 			),

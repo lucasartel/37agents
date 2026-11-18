@@ -8,7 +8,7 @@ Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Personalized AI agents for WordPress (37agents). Integrates with WordPress AI Connectors, OpenRouter, Auto-RAG, Gutenberg, LMS, and LGPD/GDPR privacy tools.
+Create AI agents for WordPress with chat, knowledge bases, Gutenberg blocks, and integrations with external AI providers.
 
 == Description ==
 

@@ -239,6 +239,7 @@ class WPAgent_Email_Schedules {
 
 		$content_prompt = sanitize_textarea_field( $data['content_prompt'] ?? '' );
 		if ( '' === trim( $content_prompt ) ) {
+			/* translators: %s: schedule or agent name. */
 			$content_prompt = sprintf( __( 'Redija um e-mail atencioso de acompanhamento sobre %s.', 'wpagent' ), ! empty( $data['name'] ) ? $data['name'] : $agent['name'] );
 		}
 
@@ -1050,8 +1051,9 @@ class WPAgent_Email_Schedules {
 			echo '<tr>';
 			echo '<td><strong>' . esc_html( $sub['recipient_email'] ) . '</strong></td>';
 			echo '<td>' . esc_html( $sub['recipient_name'] ?: '—' ) . '</td>';
-			echo '<td>' . $badge . '</td>';
-			echo '<td>' . sprintf( esc_html__( 'Passo %1$d de %2$d', 'wpagent' ), min( $sent, $total_steps ), $total_steps ) . '</td>';
+			echo '<td>' . wp_kses_post( $badge ) . '</td>';
+			/* translators: 1: current step, 2: total number of steps. */
+			echo '<td>' . esc_html( sprintf( __( 'Passo %1$d de %2$d', 'wpagent' ), min( $sent, $total_steps ), $total_steps ) ) . '</td>';
 			echo '<td>' . esc_html( $sub['last_sent_at'] ?: '—' ) . '</td>';
 			echo '<td>' . esc_html( $sub['next_send_at'] ?: '—' ) . '</td>';
 			echo '<td>' . esc_html( $sub['consented_at'] ?: ( $sub['subscribed_at'] ?: '—' ) ) . '</td>';

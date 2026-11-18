@@ -76,6 +76,7 @@ class WPAgent_Conversation_Summaries {
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Resumo da conversa gerado com sucesso.', 'wpagent' ) . '</p></div>';
 			} elseif ( 'summaries_processed' === $notice ) {
 				$count = absint( $_GET['processed'] ?? 0 );
+				/* translators: %d: number of generated summaries. */
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( sprintf( __( 'Processamento concluído: %d resumo(s) gerado(s).', 'wpagent' ), $count ) ) . '</p></div>';
 			}
 		}

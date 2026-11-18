@@ -636,6 +636,7 @@ class WPAgent_REST_Controller {
 			}
 			$title = $this->conversation_title_from_message( $message );
 			if ( ! $user_id ) {
+				/* translators: %s: conversation title. */
 				$title = sprintf( __( 'Visitante: %s', 'wpagent' ), $title );
 			}
 			$conversation     = $this->repository->create_conversation( $user_id, $agent_slug, $title, $conversation_id, $user_id ? $project_id : null );

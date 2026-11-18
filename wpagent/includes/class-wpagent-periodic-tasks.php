@@ -383,12 +383,12 @@ class WPAgent_Periodic_Tasks {
 			if ( 'run_ok' === $succ ) {
 				$pid = absint( $_GET['post_id'] ?? 0 );
 				$link = get_edit_post_link( $pid );
-				echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-					/* translators: %s: edit post url */
-					wp_kses_post( __( 'Rascunho de conteúdo gerado com sucesso! <a href="%s" target="_blank">Clique aqui para revisar o Rascunho #%d</a>.', 'wpagent' ) ),
+				echo '<div class="notice notice-success is-dismissible"><p>' . wp_kses_post( sprintf(
+					/* translators: 1: edit post URL, 2: post ID. */
+					__( 'Rascunho de conteúdo gerado com sucesso! <a href="%1$s" target="_blank">Clique aqui para revisar o Rascunho #%2$d</a>.', 'wpagent' ),
 					esc_url( $link ),
 					$pid
-				) . '</p></div>';
+				) ) . '</p></div>';
 			} else {
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Acao realizada com sucesso.', 'wpagent' ) . '</p></div>';
 			}
@@ -397,7 +397,8 @@ class WPAgent_Periodic_Tasks {
 		if ( ! empty( $_GET['error'] ) ) {
 			$err = sanitize_key( $_GET['error'] );
 			if ( 'exec_failed' === $err ) {
-				$msg = urldecode( $_GET['msg'] ?? '' );
+				$msg = sanitize_text_field( wp_unslash( $_GET['msg'] ?? '' ) );
+				/* translators: %s: error message. */
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( sprintf( __( 'Erro ao executar tarefa de conteudo: %s', 'wpagent' ), $msg ) ) . '</p></div>';
 			} else {
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Erro ao salvar. Verifique se preencheu todos os campos.', 'wpagent' ) . '</p></div>';

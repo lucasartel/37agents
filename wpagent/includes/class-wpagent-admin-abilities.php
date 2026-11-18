@@ -1640,7 +1640,10 @@ class WPAgent_Admin_Abilities {
 				<?php echo $enable_global_limit ? esc_html__( 'Sim', 'wpagent' ) : esc_html__( 'Nao', 'wpagent' ); ?>
 				&mdash;
 				<strong><?php esc_html_e( 'Limite:', 'wpagent' ); ?></strong>
-				<?php echo 0 === $global_limit ? esc_html__( 'Ilimitado', 'wpagent' ) : esc_html( sprintf( __( '%s tokens/mes', 'wpagent' ), number_format_i18n( $global_limit ) ) ); ?>
+				<?php
+				/* translators: %s: monthly token limit. */
+				echo 0 === $global_limit ? esc_html__( 'Ilimitado', 'wpagent' ) : esc_html( sprintf( __( '%s tokens/mes', 'wpagent' ), number_format_i18n( $global_limit ) ) );
+				?>
 			</p>
 
 			<h2><?php esc_html_e( 'Resumo de Uso Mensal', 'wpagent' ); ?></h2>
@@ -1656,7 +1659,10 @@ class WPAgent_Admin_Abilities {
 				<tbody>
 					<tr>
 						<td colspan="4" class="center">
-							<strong><?php echo esc_html( sprintf( __( 'Total: %s tokens de %s usuários ativos', 'wpagent' ), number_format_i18n( $total_tokens ), number_format_i18n( $active_users ) ) ); ?></strong>
+							<strong><?php
+								/* translators: 1: number of tokens, 2: number of active users. */
+								echo esc_html( sprintf( __( 'Total: %1$s tokens de %2$s usuários ativos', 'wpagent' ), number_format_i18n( $total_tokens ), number_format_i18n( $active_users ) ) );
+							?></strong>
 						</td>
 					</tr>
 					<?php if ( empty( $users_token_usage ) ) : ?>
@@ -1671,7 +1677,8 @@ class WPAgent_Admin_Abilities {
 								<td>
 									<?php
 									$user = get_userdata( absint( $usage['user_id'] ) );
-									echo $user ? esc_html( $user->display_name ) : sprintf( __( 'ID: %d', 'wpagent' ), absint( $usage['user_id'] ) );
+									/* translators: %d: user ID. */
+									echo $user ? esc_html( $user->display_name ) : esc_html( sprintf( __( 'ID: %d', 'wpagent' ), absint( $usage['user_id'] ) ) );
 									?>
 								</td>
 								<td>
@@ -1743,7 +1750,10 @@ class WPAgent_Admin_Abilities {
 					?>
 						<li>
 							<?php echo esc_html( $user->display_name ); ?>
-							&mdash; <?php echo esc_html( sprintf( __( '%s tokens', 'wpagent' ), number_format_i18n( (int) ( $usage['total_tokens'] ?? 0 ) ) ) ); ?>
+							&mdash; <?php
+							/* translators: %s: number of tokens. */
+							echo esc_html( sprintf( __( '%s tokens', 'wpagent' ), number_format_i18n( (int) ( $usage['total_tokens'] ?? 0 ) ) ) );
+							?>
 						</li>
 					<?php endif; ?>
 				<?php endforeach; ?>

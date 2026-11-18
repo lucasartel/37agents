@@ -273,9 +273,18 @@ class WPAgent_Comment_Moderation {
 			<div style="background:#fff;padding:15px;margin-bottom:20px;border:1px solid #ccd0d4;display:flex;justify-content:space-between;align-items:center;">
 				<div>
 					<strong><?php esc_html_e( 'Estatísticas:', 'wpagent' ); ?></strong>
-					<span style="margin-left:15px;"><?php printf( esc_html__( 'Analisados: %d', 'wpagent' ), absint( $total_analyzed ) ); ?></span>
-					<span style="margin-left:15px;color:#d63638;"><?php printf( esc_html__( 'Spam Detectado: %d', 'wpagent' ), $spam_detected ); ?></span>
-					<span style="margin-left:15px;color:#00a32a;"><?php printf( esc_html__( 'Aguardando Resposta: %d', 'wpagent' ), $waiting_count ); ?></span>
+					<span style="margin-left:15px;"><?php
+						/* translators: %d: number of analyzed comments. */
+						printf( esc_html__( 'Analisados: %d', 'wpagent' ), absint( $total_analyzed ) );
+					?></span>
+					<span style="margin-left:15px;color:#d63638;"><?php
+						/* translators: %d: number of spam comments. */
+						printf( esc_html__( 'Spam Detectado: %d', 'wpagent' ), absint( $spam_detected ) );
+					?></span>
+					<span style="margin-left:15px;color:#00a32a;"><?php
+						/* translators: %d: number of comments awaiting a reply. */
+						printf( esc_html__( 'Aguardando Resposta: %d', 'wpagent' ), absint( $waiting_count ) );
+					?></span>
 				</div>
 				<div>
 					<button id="wpagent-run-moderation-now" class="button button-primary">⚡ <?php esc_html_e( 'Analisar comentários pendentes agora', 'wpagent' ); ?></button>
@@ -320,7 +329,10 @@ class WPAgent_Comment_Moderation {
 									<p class="description" style="margin-top:5px;"><?php echo esc_html( $spam_reason ); ?></p>
 								<?php else : ?>
 									<span style="background:#00a32a;color:#fff;padding:3px 8px;border-radius:3px;font-size:12px;font-weight:bold;"><?php esc_html_e( 'Legítimo', 'wpagent' ); ?></span>
-									<p class="description" style="margin-top:5px;"><?php printf( esc_html__( 'Sentimento: %s', 'wpagent' ), esc_html( ucfirst( $sentiment ) ) ); ?></p>
+									<p class="description" style="margin-top:5px;"><?php
+										/* translators: %s: detected sentiment. */
+										printf( esc_html__( 'Sentimento: %s', 'wpagent' ), esc_html( ucfirst( $sentiment ) ) );
+									?></p>
 								<?php endif; ?>
 							</td>
 							<td>

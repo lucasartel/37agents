@@ -6,7 +6,6 @@
  * Version: 0.8.0
  * Requires at least: 6.2
  * Requires PHP: 7.4
- * Tested up to: 6.8
  * Author: 37graus
  * Author URI: https://37graus.com.br/wp-agents
  * License: GPL-2.0-or-later

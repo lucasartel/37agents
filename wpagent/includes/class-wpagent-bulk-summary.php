@@ -65,7 +65,7 @@ class WPAgent_Bulk_Summary {
             printf(
                 /* translators: %d: number of posts */
                 esc_html( _n( 'Resumo gerado para %d post.', 'Resumos gerados para %d posts.', $count, 'wpagent' ) ),
-                $count
+                absint( $count )
             );
             echo '</p></div>';
         }
@@ -75,7 +75,7 @@ class WPAgent_Bulk_Summary {
             printf(
                 /* translators: %d: number of failures */
                 esc_html( _n( 'Falha ao gerar resumo para %d post.', 'Falha ao gerar resumo para %d posts.', $count, 'wpagent' ) ),
-                $count
+                absint( $count )
             );
             echo '</p></div>';
         }
