@@ -365,6 +365,9 @@ class WPAgent_REST_Controller {
 		}
 
 		$agent = $this->agents->get_agent( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		if ( ! $this->user_can_access_agent( $agent ) ) {
+			return false;
+		}
 		if ( '1' === ( $agent['admin_assistant'] ?? '0' ) && ! current_user_can( 'manage_options' ) ) {
 			return false;
 		}
@@ -382,6 +385,9 @@ class WPAgent_REST_Controller {
 		}
 
 		$agent = $this->agents->get_agent( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		if ( ! $this->user_can_access_agent( $agent ) ) {
+			return false;
+		}
 		if ( '1' === ( $agent['admin_assistant'] ?? '0' ) && ! current_user_can( 'manage_options' ) ) {
 			return false;
 		}
@@ -401,6 +407,9 @@ class WPAgent_REST_Controller {
 		}
 
 		$agent = $this->agents->get_agent( $request->get_param( 'agent_slug' ) ?: $this->settings->get( 'agent_slug', 'default' ) );
+		if ( ! $this->user_can_access_agent( $agent ) ) {
+			return false;
+		}
 
 		if ( '1' === ( $agent['admin_assistant'] ?? '0' ) && ! current_user_can( 'manage_options' ) ) {
 			return false;

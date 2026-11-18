@@ -112,5 +112,7 @@ foreach ( $meta_keys as $key ) {
 	delete_post_meta_by_key( $key );
 }
 
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->posts} WHERE post_type = %s", 'wpagent_agent' ) );
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->postmeta} WHERE post_id NOT IN (SELECT ID FROM {$wpdb->posts})" ) );
+$agent_ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s", 'wpagent_agent' ) );
+foreach ( $agent_ids as $agent_id ) {
+	wp_delete_post( (int) $agent_id, true );
+}

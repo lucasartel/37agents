@@ -20,7 +20,7 @@ Personalized AI agents for WordPress (37agents). Integrates with WordPress AI Co
 * **Gutenberg Block & Shortcodes** — Insert AI agents anywhere using the visual `37agents/agent-widget` block (`Agent Widget (37agents)`), `[37agents_chat]`, or legacy `[wpagent_chat]` shortcodes with `layout` and `theme` options.
 * **1-Click Starter Templates** — Launch configured agents in one click for Atendimento & Suporte, Diagnóstico & Pré-venda, Tutor de Curso (EAD), and Copiloto Editorial.
 * **Auto-RAG for WordPress Content** — Automatically index published `post`, `page`, WooCommerce `product`, and public Custom Post Types on save or manual sync.
-* **Progressive Streaming (SSE)** — Stream AI chat responses progressively via Server-Sent Events (`/wpagent/v1/chat/stream`) with transparent JSON fallback.
+* **SSE response delivery** — Deliver completed AI responses in chunks via Server-Sent Events (`/wpagent/v1/chat/stream`) with JSON fallback. Provider generation is not streamed.
 * **Privacy & LGPD/GDPR Tools** — Built-in WordPress Personal Data Exporters, Personal Data Eraser, Privacy Policy guide text, and optional per-agent consent banner.
 * **Lead Capture & Webhooks** — Optional guest lead capture bar before or during interactions and non-blocking SSRF-safe outbound webhooks (`lead_captured`, `conversation_started`, `steps_report_generated`).
 * **Frontend Layouts (Chat, STEPS & EAD)** — Support interactive conversations, guided diagnostic questionnaires with printable reports, and full LMS courses with an integrated AI Tutor.
@@ -33,7 +33,7 @@ Personalized AI agents for WordPress (37agents). Integrates with WordPress AI Co
 This plugin can communicate with external third-party services only when explicitly configured by the site administrator:
 
 **1. OpenRouter (openrouter.ai)**
-When an OpenRouter API key is configured, this plugin sends chat messages and RAG context to the OpenRouter API to generate AI responses (standard JSON or Server-Sent Events streaming).
+When configured, this plugin sends chat messages, conversation context, and relevant RAG content to OpenRouter to generate responses. If semantic embeddings are enabled, indexed document chunks and search queries are also sent to its embeddings API. Requests include the site URL and name.
 - Service: https://openrouter.ai
 - Privacy Policy: https://openrouter.ai/privacy
 - Terms of Use: https://openrouter.ai/terms
@@ -44,7 +44,15 @@ When the official WordPress AI plugin (wordpress.org/plugins/ai/) is installed a
 
 **3. Compatible AI Subscriptions & APIs (Optional — Xiaomi MiMo, Alibaba Qwen/Bailian, Zhipu GLM / Z.ai, Moonshot Kimi, MiniMax, Volcengine Ark, DeepSeek, SiliconFlow, or Custom OpenCode/OpenAI endpoint)**
 When an administrator explicitly configures a Compatible Plan API key (`compatible_api_key`) and selects one of the built-in presets or enters a custom OpenAI-compatible endpoint URL, chat messages and RAG context are transmitted over HTTPS (`wp_safe_remote_post`) to the selected provider's `/chat/completions` endpoint.
-- Supported provider consoles include `platform.xiaomimimo.com`, `dashscope.aliyuncs.com`, `open.bigmodel.cn`, `z.ai`, `kimi.ai`, `kimi.com`, `api.minimaxi.com`, `volces.com`, `deepseek.com`, `siliconflow.com`, or any custom OpenAI-compatible URL entered by the administrator.
+- Xiaomi MiMo: https://platform.xiaomimimo.com/ — https://www.mi.com/global/about/privacy/
+- Alibaba Cloud: https://www.alibabacloud.com/ — https://www.alibabacloud.com/help/en/legal/latest/alibaba-cloud-privacy-policy
+- Zhipu / Z.ai: https://z.ai/ — https://z.ai/privacy
+- Moonshot: https://platform.moonshot.ai/ — https://www.moonshot.ai/privacy
+- MiniMax: https://platform.minimax.io/ — https://www.minimax.io/privacy-policy
+- Volcengine: https://www.volcengine.com/ — https://www.volcengine.com/docs/6491/116977
+- DeepSeek: https://platform.deepseek.com/ — https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html
+- SiliconFlow: https://siliconflow.com/ — https://siliconflow.com/privacy-policy
+- For a custom endpoint or WordPress AI connector, the administrator must review the selected provider's terms and privacy policy before use.
 
 **4. Outbound Webhook Integration (Optional, per-agent)**
 When an administrator explicitly enables Outbound Webhooks and enters a valid destination URL in an agent's settings, the plugin dispatches non-blocking HTTP POST JSON payloads (`wp_safe_remote_post`) when configured events occur (`lead_captured`, `conversation_started`, `steps_report_generated`).
@@ -54,9 +62,11 @@ When an administrator explicitly enables Outbound Webhooks and enters a valid de
 
 37agents stores conversation transcripts, interaction logs, user memories, Steps/EAD progress, and optional visitor lead submissions locally in your WordPress database.
 
-* **WordPress Privacy Tools:** Under *Tools > Export Personal Data* and *Tools > Erase Personal Data*, 37agents registers Personal Data Exporters and a Personal Data Eraser covering conversations, interactions, memories, progress, projects, and token usage records associated with a user's email address, plus suggested Privacy Policy guide content (*Settings > Privacy*).
+* **WordPress Privacy Tools:** Exporters cover registered users' conversations, interactions, memories, progress, projects, token usage and conversation summaries, plus email events and subscriptions matched by recipient email. The eraser removes these registered-user records and email records. Suggested policy text is available under *Settings > Privacy*.
+* **Guest data limitation:** Guest leads are temporarily stored for seven days by session, not indexed by email. Guest conversations and progress cannot currently be reliably found or erased by email with the WordPress privacy tools. Administrators must provide an appropriate manual process and retention policy.
 * **Consent Notice & Lead Capture:** Administrators can enable an optional per-agent privacy consent notice linking to the site's Privacy Policy page (`wp_get_privacy_policy_url()`) and an optional lead capture bar (name and email) for unauthenticated visitors.
 * Administrators remain responsible for reviewing their Privacy Policy when connecting third-party AI providers or custom outbound webhook endpoints.
+* Deleting the plugin removes its tables, settings and agent posts. Back up any data you need before uninstalling.
 
 == Installation ==
 
@@ -103,67 +113,6 @@ Conversations and optional guest leads are stored locally in your WordPress data
 == Changelog ==
 
 = 0.8.0 =
-* **New — AI Coding / Token Plan Subscriptions & OpenAI-Compatible APIs:** Added native presets and encrypted credential storage for Xiaomi MiMo Token Plan (`tp-...`/`ttp-...` and standard `sk-...`), Alibaba Cloud Qwen / Bailian Coding Plan, Zhipu GLM Coding Plan / Z.ai, Moonshot Kimi Code, MiniMax M Plan, Volcengine Ark, DeepSeek, SiliconFlow, and custom OpenCode/OpenAI endpoints (with global settings and per-agent overrides).
-* **Rebrand:** Renamed plugin to **37agents** across the Admin UI, Settings, Dashboard, and new `[37agents_chat]` shortcode alias (fully compatible with `[wpagent_chat]`).
-* **WP.org Compliance:** Removed `Update URI` header, moved all inline `<script>` blocks into dedicated enqueued scripts (`assets/js/admin.js`), scoped admin styles to plugin screens, and loaded textdomains cleanly on `init` (WordPress 6.7+ compatibility). Set `Requires at least: 6.2` and `Tested up to: 6.8`.
-* **Privacy (LGPD/GDPR):** Added WordPress Personal Data Exporters (conversations, interactions, memories, user progress), Personal Data Eraser, Privacy Policy suggested content (`WPAgent_Privacy`), and per-agent Privacy Consent notice bar.
-* **New — Gutenberg Block:** Added `37agents/agent-widget` block (`Agent Widget (37agents)`) with agent, layout (`chat`/`steps`/`ead`), theme (`light`/`dark`), and title inspector controls.
-* **New — Starter Templates:** Added 1-click presets in Agent creation/editing for Support, Diagnostic (`steps`), Course Tutor (`ead`), and Editorial Copilot.
-* **New — Auto-RAG for WordPress Content:** Index published `post`, `page`, WooCommerce `product`, and public custom post types automatically on `save_post` or manual sync.
-* **New — Progressive Streaming (SSE):** Added `/wpagent/v1/chat/stream` Server-Sent Events endpoint and client progressive Markdown rendering with automatic JSON fallback.
-* **New — Lead Capture & Webhooks:** Added optional guest Lead Capture bar (`/wpagent/v1/leads`) and SSRF-safe non-blocking outbound webhooks (`lead_captured`, `conversation_started`, `steps_report_generated`).
-* **Maintenance:** Updated `uninstall.php` to clean up all new metadata keys cleanly on uninstall.
+* Added provider integrations, Gutenberg block, privacy tools, Auto-RAG, SSE delivery, and lead capture.
 
-= 0.7.1 =
-* **Security:** Hardened Markdown link rendering against DOM XSS across Chat, Steps, and EAD layouts
-* **Security:** Restricted global EAD lesson regeneration to administrators and editors
-* **Security:** Isolated guest conversations and restricted project tabs to authenticated users
-* **Security:** Removed HTML/HTM from public chat uploads and enforced real MIME/extension validation
-* **Security:** Encrypted OpenRouter API key at rest (AES-256-CBC) and added `WPAGENT_OPENROUTER_API_KEY` constant support
-* **Security:** Added strict sanitization and payload size limits on `progress` and `steps/generate-report` endpoints
-* **Performance:** Eliminated per-request `SHOW TABLES` / `SHOW COLUMNS` queries via schema version guard and static cache
-* **Performance:** Moved Periodic Content and Comment Moderation triggers to non-blocking background WP-Cron execution
-* **UI/UX:** Organized Agent Settings metabox into 4 horizontal tabs (Geral & Layout, Prompt & Contexto, Modelo & Limites, Permissões & Recursos)
-* **UI/UX:** Added full Dark Mode support, theme switcher, collapsible mobile modules drawer, and per-lesson Tutor IA history persistence in EAD layout
-* **UI/UX:** Replaced native browser `prompt()`, `confirm()`, and `alert()` dialogs with accessible inline modals
-
-= 0.7.0 =
-* **New:** Layout Frontend STEPS — interactive step-by-step guided questionnaire with automated AI final report generation
-* **New:** Layout Frontend EAD — full virtual learning environment (LMS) with module/lesson sidebar, progress tracking, and integrated AI Lesson Tutor
-* **New:** User Progress Persistence — automatic state recovery across sessions for logged-in and guest users
-* **New:** AI Syllabus Generator — 1-click automatic course outline generation based on agent training documents
-* **New:** Agent layout configuration dropdown in Agent Settings (`chat`, `steps`, `ead`)
-* **New:** Shortcode layout override support: `[wpagent_chat layout="steps|ead|chat"]`
-
-= 0.6.1 =
-* **New:** Moderação de Comentários com IA — automated spam classification, sentiment detection, and 1-click suggested replies
-* **New:** Ability `wpagent/audit-comments` added to Admin Abilities system
-* **Fix:** Periodic comment moderation background processing
-
-= 0.6.0 =
-* **New:** Front-end File Upload & RAG Scope Selection — upload documents in chat widget with conversation/project scope selection
-* **Fix:** Project conversations list in sidebar — fixed payload and database query for project-bound conversations
-* **New:** Dashboard badge showing active AI provider (WordPress AI or OpenRouter)
-* **New:** Dismissible notice when no AI provider is configured
-* **New:** Role-based access control — restrict which WordPress roles can use each agent
-* **New:** Suggest Reply for Comments — generate AI reply suggestions for comment moderation
-* **New:** Bulk Post Summarization — generate `post_excerpt` for multiple posts at once
-* **New:** AI Content Traceability — track posts generated by Periodic Content (agent, timestamp, prompt)
-* **New:** Configurable AI request timeout (filter: `wpagent_ai_request_timeout`)
-* **Fix:** All admin notices are now dismissible (WP.org Rule 11 compliance)
-* **Fix:** External services disclosure added to Settings page (WP.org Rule 7 compliance)
-* **Improved:** Plugin version bumped to 0.6.0
-
-= 0.5.9 =
-* Internationalization: all strings wrapped with i18n functions (pt_BR, es_ES, en_US)
-* Periodic content (DRIP) timestamp bug fixed
-* Email scheduling module temporarily hidden pending stability improvements
-* Various admin UI and security hardening improvements
-
-== Upgrade Notice ==
-
-= 0.8.0 =
-Rebranded to 37agents with WP.org compliance updates, Gutenberg block, Starter Templates, Auto-RAG, SSE streaming, LGPD/GDPR tools, Lead Capture, and Webhooks. Fully backward-compatible with [wpagent_chat].
-
-= 0.6.0 =
-Major feature release. Update recommended. No database schema changes required.
+Previous releases: https://github.com/lucasartel/37agents

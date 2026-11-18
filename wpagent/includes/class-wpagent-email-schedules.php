@@ -163,20 +163,13 @@ class WPAgent_Email_Schedules {
 		}
 
 		if ( '' === $clean_reply ) {
-			$clean_reply = __( 'Inscrição de e-mails agendada com sucesso.', 'wpagent' );
-		}
-
-		// Auto-confirm subscription seamlessly when to_email is valid
-		$confirm_result = null;
-		if ( ! empty( $proposal['to_email'] ) && is_email( $proposal['to_email'] ) ) {
-			$confirm_result = $this->confirm( $proposal, $agent, $context );
+			$clean_reply = __( 'Confirme se deseja receber estes e-mails.', 'wpagent' );
 		}
 
 		return array(
 			'reply'          => $clean_reply,
 			'proposal'       => $proposal,
-			'auto_confirmed' => ! empty( $confirm_result ) && ! is_wp_error( $confirm_result ),
-			'confirm_result' => is_wp_error( $confirm_result ) ? null : $confirm_result,
+			'auto_confirmed' => false,
 		);
 	}
 
@@ -1319,4 +1312,3 @@ class WPAgent_Email_Schedules {
 	}
 }
 }
-

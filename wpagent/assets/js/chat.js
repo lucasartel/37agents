@@ -1005,17 +1005,21 @@
 		var card = document.createElement('div');
 		var heading = document.createElement('strong');
 		var details = document.createElement('span');
+		var button = document.createElement('button');
 
-		card.className = 'wpagent-chat__schedule-proposal is-confirmed';
-		heading.textContent = '✅ ' + t('scheduleConfirmed', 'Inscrição Confirmada') + ': ' + (proposal.name || scheduleTypeLabel(proposal));
+		card.className = 'wpagent-chat__schedule-proposal';
+		heading.textContent = t('scheduleProposal', 'Inscrição proposta') + ': ' + (proposal.name || scheduleTypeLabel(proposal));
 		details.textContent = scheduleDescription(proposal);
+		button.type = 'button';
+		button.textContent = t('confirmSchedule', 'Confirmar inscrição');
 
 		card.appendChild(heading);
 		card.appendChild(details);
+		card.appendChild(button);
 		message.appendChild(card);
 
-		// If for any reason auto_confirmed was not flagged by backend, confirm silently in background
-		if (!body || !body.auto_confirmed) {
+		button.addEventListener('click', function () {
+			button.disabled = true;
 			request(config, config.emailSchedulesUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -1026,8 +1030,15 @@
 					conversation_id: conversationId,
 					interaction_id: body && body.interaction_id ? body.interaction_id : 0
 				})
-			}).catch(function () {});
-		}
+			}).then(function () {
+				card.classList.add('is-confirmed');
+				heading.textContent = t('scheduleConfirmed', 'Inscrição confirmada');
+				button.remove();
+			}).catch(function (error) {
+				button.disabled = false;
+				setStatus(error.message);
+			});
+		});
 	}
 
 	function scheduleTypeLabel(proposal) {
